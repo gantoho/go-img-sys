@@ -1,6 +1,6 @@
 package main
 
-import "test/app"
+import "github.com/gantoho/go-img-sys/app"
 
 func main() {
 	app.Start()

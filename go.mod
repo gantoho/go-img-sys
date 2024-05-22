@@ -1,4 +1,4 @@
-module test
+module github.com/gantoho/go-img-sys
 
 go 1.22.2
 

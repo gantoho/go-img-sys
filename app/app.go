@@ -1,6 +1,6 @@
 package app
 
-import "test/app/router"
+import "github.com/gantoho/go-img-sys/app/router"
 
 func Start() {
 	router.InitRouter()

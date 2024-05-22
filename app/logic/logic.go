@@ -2,11 +2,12 @@ package logic
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 type imgDataType struct {
@@ -15,6 +16,7 @@ type imgDataType struct {
 }
 
 func OpFiles(context *gin.Context) {
+	host := context.Request.Host
 	dst := "./files"
 	files, err := os.Open(dst) //open the directory to read files in the directory
 	if err != nil {
@@ -30,7 +32,7 @@ func OpFiles(context *gin.Context) {
 	imgData := &imgDataType{}
 	imgData.total = len(fileInfos)
 	for _, fileInfos := range fileInfos {
-		imgData.data = append(imgData.data, "http://files.ganto.cn/files/"+fileInfos.Name())
+		imgData.data = append(imgData.data, host+"/files/"+fileInfos.Name())
 	}
 	context.JSON(http.StatusOK, map[string]any{"total": imgData.total, "data": imgData.data})
 }
@@ -52,6 +54,7 @@ func Bgimg(context *gin.Context) {
 }
 
 func Upload(context *gin.Context) {
+	host := context.Request.Host
 	form, _ := context.MultipartForm()
 	files := form.File["files"]
 	return_ := map[int]string{}
@@ -61,7 +64,7 @@ func Upload(context *gin.Context) {
 		if err != nil {
 			return
 		}
-		return_[i] = "http://files.ganto.cn/files/" + file.Filename
+		return_[i] = host + "/files/" + file.Filename
 	}
 	context.JSON(http.StatusOK, gin.H{"msg": fmt.Sprintf("%d个文件，上传成功", len(files)), "urls": return_})
 }
