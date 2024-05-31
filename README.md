@@ -3,6 +3,11 @@
 
 ```shell
 $ git clone https://github.com/gantoho/go-img-sys.git
+$ cd go-img-sys
+```
+
+Go启动
+```shell
 $ go mod tidy
 $ go run main.go
 ```
