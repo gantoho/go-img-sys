@@ -12,6 +12,11 @@ $ go mod tidy
 $ go run main.go
 ```
 
+运行在本机3128端口
+```
+http://localhost:3128/v1
+```
+
 打包二进制文件
 linux
 ```shell
