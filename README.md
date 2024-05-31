@@ -2,7 +2,7 @@
 快速启动一个图片服务器
 
 ```shell
-$ go clone https://github.com/gantoho/go-img-sys.git
+$ git clone https://github.com/gantoho/go-img-sys.git
 $ go mod tidy
 $ go run main.go
 ```
