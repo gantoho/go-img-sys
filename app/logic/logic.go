@@ -15,6 +15,23 @@ type imgDataType struct {
 	data  []string
 }
 
+func ReadFiles(ctx *gin.Context) {
+	// 获取 URL 中的文件名参数
+	filename := ctx.Param("filename")
+
+	// 指定文件所在的目录
+	filepath := "./files/" + filename
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
+
+	// 发送文件给客户端
+	ctx.File(filepath)
+}
+
 func OpFiles(context *gin.Context) {
 	host := context.Request.Host
 	dst := "./files"
