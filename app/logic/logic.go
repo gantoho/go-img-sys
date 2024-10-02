@@ -49,7 +49,7 @@ func OpFiles(context *gin.Context) {
 	imgData := &imgDataType{}
 	imgData.total = len(fileInfos)
 	for _, fileInfos := range fileInfos {
-		imgData.data = append(imgData.data, host+"/files/"+fileInfos.Name())
+		imgData.data = append(imgData.data, host+"/f/"+fileInfos.Name())
 	}
 	context.JSON(http.StatusOK, map[string]any{"total": imgData.total, "data": imgData.data})
 }
@@ -87,6 +87,7 @@ func Upload(context *gin.Context) {
 }
 
 func BgimgNum(context *gin.Context) {
+	host := context.Request.Host
 	numStr := context.Param("number")
 	num, _ := strconv.Atoi(numStr)
 	dst := "./files"
@@ -102,14 +103,14 @@ func BgimgNum(context *gin.Context) {
 		return
 	}
 	group := make([]string, 0)
-	if num <= 0 {
-		num = 1
-	}
 	if num >= 10 {
 		num = 10
 	}
+	if len(fileInfos) < num {
+		num = len(fileInfos)
+	}
 	for i := 0; i < num; i++ {
-		group = append(group, fileInfos[rand.Intn(len(fileInfos))].Name())
+		group = append(group, host+"/f/"+fileInfos[rand.Intn(len(fileInfos))].Name())
 	}
 	context.JSON(http.StatusOK, gin.H{"code": http.StatusOK, "msg": "success", "data": group})
 }
