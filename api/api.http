@@ -1,0 +1,76 @@
+<!-- 获取所有图片 -->
+GET http://localhost:3128/api/v1/images
+Accept: application/json
+
+###
+
+<!-- 获取单个随机图片 -->
+GET http://localhost:3128/api/v1/images/random
+Accept: text/plain
+
+###
+
+<!-- 获取N个随机图片 -->
+GET http://localhost:3128/api/v1/images/random/3
+Accept: application/json
+
+###
+
+<!-- 健康检查 -->
+GET http://localhost:3128/api/v1/health
+Accept: application/json
+
+###
+
+<!-- 上传图片 -->
+POST http://localhost:3128/api/v1/images/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="files"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< /path/to/your/image.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+
+<!-- 直接获取图片文件 -->
+GET http://localhost:3128/f/image.jpg
+
+###
+
+<!-- 遗留API: 健康检查 -->
+GET http://localhost:3128/v1/
+Accept: application/json
+
+###
+
+<!-- 遗留API: 获取所有图片 -->
+GET http://localhost:3128/v1/all
+Accept: application/json
+
+###
+
+<!-- 遗留API: 获取随机图片 -->
+GET http://localhost:3128/v1/bgimg
+Accept: text/plain
+
+###
+
+<!-- 遗留API: 获取N个随机图片 -->
+GET http://localhost:3128/v1/get/5
+Accept: application/json
+
+###
+
+<!-- 遗留API: 上传图片 -->
+POST http://localhost:3128/v1/upload
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="files"; filename="test.jpg"
+Content-Type: image/jpeg
+
+< /path/to/your/image.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--

@@ -1,3 +1,113 @@
-.idea
+# 编译产物和二进制文件
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+/image-sys
+/build/image-sys
+image-sys.exe
+
+# 测试输出
+*.test
+*.out
+*.cover
+*.profile
+
+# Go依赖
+vendor/
+go.work
+go.work.sum
+
+# IDE和编辑器
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# 构建和临时文件
+build/
 bin/
+tmp/
+temp/
+dist/
+.air
+air.log
+
+# 环境和配置
+.env
+.env.local
+.env.*.local
+.env.production.local
+
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.air.log
+build-errors.log
+
+# 操作系统特定文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE临时文件
+.vscode-test
+.vs/
+.gradle
+.nb-gradle/
+
+# 自定义目录
+# 上传的文件应该进行版本控制或使用文件存储服务
+# files/（根据项目需求决定是否忽略）
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Vim/Neovim
+.nvimrc
+.exrc
+
+# Git
+.git/
+.gitattributes
+
+# npm (如果使用了JavaScript工具)
+node_modules/
+package-lock.json
+yarn.lock
+
+# 覆盖率报告
+coverage/
+*.lcov
+.nyc_output/
+
+# 其他构建工具
+dist/
+build/
+.gradle/
+.maven/
+
+# Air热加载
+tmp/
+*.tmp

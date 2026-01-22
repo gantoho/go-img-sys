@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  image-sys:
+    build: .
+    ports:
+      - "3128:3128"
+    volumes:
+      - ./files:/root/files
+      - ./logs:/root/logs
+    environment:
+      - GIN_MODE=release
+    restart: unless-stopped
