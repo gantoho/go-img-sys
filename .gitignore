@@ -78,7 +78,10 @@ Thumbs.db
 
 # 自定义目录
 # 上传的文件应该进行版本控制或使用文件存储服务
-# files/（根据项目需求决定是否忽略）
+files/*
+!files/Austria_fairy_tale_world-Bing_Desktop_Wallpaper Wallpaper_1920x1080[10wallpaper.com].jpg
+!files/China_Tibet_Potala_Palace_sunset_blue_sky Wallpaper_1920x1080[10wallpaper.com].jpg
+!files/cny24_dl_wallpaper_mac_12032x6768_2x.jpg
 
 # MacOS
 .AppleDouble

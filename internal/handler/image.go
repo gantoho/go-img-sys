@@ -2,9 +2,11 @@ package handler
 
 import (
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
 
+	"github.com/gantoho/go-img-sys/internal/config"
 	"github.com/gantoho/go-img-sys/internal/service"
 	"github.com/gantoho/go-img-sys/pkg/auth"
 	"github.com/gantoho/go-img-sys/pkg/logger"
@@ -151,21 +153,67 @@ func (h *ImageHandler) UploadImage(ctx *gin.Context) {
 	uploadedFiles := make([]map[string]interface{}, 0)
 	failedFiles := make([]map[string]string, 0)
 
+	cfg := config.GetConfig()
+	uploadDir := cfg.File.UploadDir
+	dupStrategy := cfg.File.DuplicateStrategy
+
 	for idx, file := range files {
-		dst := "./files/" + file.Filename
-		if err := ctx.SaveUploadedFile(file, dst); err != nil {
-			h.logger.Error("Failed to save file %s: %v", file.Filename, err)
+		origName := file.Filename
+		dstName := origName
+		dstPath := utils.GetUploadPath(uploadDir, dstName)
+
+		// Handle duplicates according to strategy
+		if utils.FileExists(dstPath) {
+			switch dupStrategy {
+			case "overwrite":
+				// do nothing, will overwrite
+			case "reject":
+				failedFiles = append(failedFiles, map[string]string{
+					"filename": origName,
+					"error":    "file already exists",
+				})
+				h.logger.Warn("Upload rejected for existing file %s", origName)
+				continue
+			default: // rename
+				// generate unique name: name_1.ext, name_2.ext ...
+				ext := filepath.Ext(origName)
+				nameOnly := origName[:len(origName)-len(ext)]
+				i := 1
+				for {
+					dstName = nameOnly + "_" + strconv.Itoa(i) + ext
+					dstPath = utils.GetUploadPath(uploadDir, dstName)
+					if !utils.FileExists(dstPath) {
+						break
+					}
+					i++
+				}
+			}
+		}
+
+		// Ensure upload dir exists
+		if err := utils.EnsureDir(uploadDir); err != nil {
+			h.logger.Error("Failed to ensure upload dir: %v", err)
 			failedFiles = append(failedFiles, map[string]string{
-				"filename": file.Filename,
+				"filename": origName,
+				"error":    "server error: cannot create upload dir",
+			})
+			continue
+		}
+
+		if err := ctx.SaveUploadedFile(file, dstPath); err != nil {
+			h.logger.Error("Failed to save file %s -> %s: %v", origName, dstPath, err)
+			failedFiles = append(failedFiles, map[string]string{
+				"filename": origName,
 				"error":    err.Error(),
 			})
 			continue
 		}
+
 		uploadedFiles = append(uploadedFiles, map[string]interface{}{
 			"index":    idx + 1,
-			"filename": file.Filename,
+			"filename": dstName,
 			"size":     file.Size,
-			"url":      hostURL + "/f/" + file.Filename,
+			"url":      hostURL + "/f/" + dstName,
 			"progress": 100,
 		})
 	}

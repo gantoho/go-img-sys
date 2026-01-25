@@ -15,6 +15,8 @@ type FileConfig struct {
 	UploadDir  string
 	MaxSize    int64 // MB
 	AllowTypes []string
+	// DuplicateStrategy controls how to handle filename conflicts: "overwrite", "rename", "reject"
+	DuplicateStrategy string
 }
 
 var AppConfig *Config
@@ -30,6 +32,7 @@ func Init() *Config {
 			UploadDir:  "./files",
 			MaxSize:    100, // 100MB
 			AllowTypes: []string{"image/jpeg", "image/png", "image/gif", "image/webp"},
+			DuplicateStrategy: "rename",
 		},
 	}
 	return AppConfig
