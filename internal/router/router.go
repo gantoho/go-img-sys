@@ -71,6 +71,8 @@ func RegisterRoutes(router *gin.Engine) {
 	// Direct file access
 	router.GET("/f/:filename", imageHandler.GetImage)
 
+	router.GET("/bgimg", imageHandler.GetRandomImage)
+
 	// Legacy support - public read operations
 	legacyV1 := router.Group("/v1")
 	{
