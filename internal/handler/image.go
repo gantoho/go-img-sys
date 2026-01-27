@@ -453,3 +453,74 @@ func (h *ImageHandler) StartThumbnailGeneration(ctx *gin.Context) {
 		"message": "Thumbnail generation started (background task)",
 	})
 }
+
+// Login handles user login and returns JWT token
+func (h *ImageHandler) Login(ctx *gin.Context) {
+	var req struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.CustomResponse(ctx, http.StatusBadRequest, "invalid request body", nil)
+		return
+	}
+
+	// Simple authentication - in production, validate against database with hashed passwords
+	var userID, role string
+	switch {
+	case req.Username == "admin" && req.Password == "admin123":
+		userID = "1"
+		role = "admin"
+	case req.Username == "user" && req.Password == "user123":
+		userID = "2"
+		role = "user"
+	default:
+		utils.CustomResponse(ctx, http.StatusUnauthorized, "invalid username or password", nil)
+		return
+	}
+
+	// Generate JWT token
+	jwtManager := auth.GetJWTManager()
+	token, err := jwtManager.GenerateToken(userID, req.Username, role)
+	if err != nil {
+		utils.CustomResponse(ctx, http.StatusInternalServerError, "failed to generate token", nil)
+		return
+	}
+
+	utils.SuccessResponse(ctx, map[string]interface{}{
+		"token":      token,
+		"user_id":    userID,
+		"username":   req.Username,
+		"role":       role,
+		"expires_at": time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05"),
+	})
+}
+
+// RefreshToken handles JWT token refresh
+func (h *ImageHandler) RefreshToken(ctx *gin.Context) {
+	authHeader := ctx.GetHeader("Authorization")
+	if authHeader == "" {
+		utils.CustomResponse(ctx, http.StatusUnauthorized, "missing authorization header", nil)
+		return
+	}
+
+	// Extract token from "Bearer <token>" format
+	tokenString := authHeader
+	if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		tokenString = authHeader[7:]
+	}
+
+	// Refresh token
+	jwtManager := auth.GetJWTManager()
+	newToken, err := jwtManager.RefreshToken(tokenString)
+	if err != nil {
+		utils.CustomResponse(ctx, http.StatusUnauthorized, "failed to refresh token", nil)
+		return
+	}
+
+	utils.SuccessResponse(ctx, map[string]interface{}{
+		"token":      newToken,
+		"expires_at": time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05"),
+	})
+}

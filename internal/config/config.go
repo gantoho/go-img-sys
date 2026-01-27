@@ -1,14 +1,22 @@
 package config
 
+import "time"
+
 type Config struct {
 	Server ServerConfig
 	File   FileConfig
+	Auth   AuthConfig
 }
 
 type ServerConfig struct {
 	Port    string
 	Env     string
 	Timeout int
+}
+
+type AuthConfig struct {
+	JWTSecret string
+	JWTExpire time.Duration
 }
 
 type FileConfig struct {
@@ -29,10 +37,14 @@ func Init() *Config {
 			Timeout: 30,
 		},
 		File: FileConfig{
-			UploadDir:  "./files",
-			MaxSize:    100, // 100MB
-			AllowTypes: []string{"image/jpeg", "image/png", "image/gif", "image/webp"},
+			UploadDir:         "./files",
+			MaxSize:           100, // 100MB
+			AllowTypes:        []string{"image/jpeg", "image/png", "image/gif", "image/webp"},
 			DuplicateStrategy: "rename",
+		},
+		Auth: AuthConfig{
+			JWTSecret: "your-secret-key-change-this-in-production", // Change this in production!
+			JWTExpire: 24 * time.Hour,
 		},
 	}
 	return AppConfig
