@@ -51,6 +51,7 @@ air.log
 .env.local
 .env.*.local
 .env.production.local
+configs/api_keys.json
 
 # 日志文件
 logs/

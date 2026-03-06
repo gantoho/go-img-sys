@@ -51,10 +51,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 	// v1 protected routes - write operations require JWT
 	v1Protected := api.Group("/v1")
-	jwtMiddleware, err := middleware.JWTMiddleware(jwtManager)
-	if err == nil {
-		v1Protected.Use(jwtMiddleware.MiddlewareFunc())
-	}
+	v1Protected.Use(middleware.AuthMiddleware())
 	{
 		v1Protected.POST("/images/upload", imageHandler.UploadImage)
 		v1Protected.DELETE("/images/:filename", imageHandler.DeleteImage)
@@ -63,14 +60,15 @@ func RegisterRoutes(router *gin.Engine) {
 
 	// v1 admin routes - requires JWT with admin role
 	v1Admin := api.Group("/v1/admin")
-	if err == nil {
-		v1Admin.Use(jwtMiddleware.MiddlewareFunc())
-	}
+	v1Admin.Use(middleware.AuthMiddleware())
 	{
-		v1Admin.POST("/api-keys", imageHandler.CreateAPIKey)
 		v1Admin.GET("/api-keys", imageHandler.ListAPIKeys)
 		v1Admin.DELETE("/api-keys", imageHandler.RevokeAPIKey)
 	}
+
+	// Public endpoint for creating API keys (no authentication)
+	api.POST("/v1/admin/api-keys", imageHandler.CreateAPIKey)
+	api.POST("/v1/admin/api-keys/validate", imageHandler.ValidateAPIKey)
 
 	// v1 utility routes - statistics, export, cleanup (public read, protected write)
 	v1Util := api.Group("/v1/util")
@@ -82,9 +80,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 	// v1 utility protected routes
 	v1UtilProtected := api.Group("/v1/util")
-	if err == nil {
-		v1UtilProtected.Use(jwtMiddleware.MiddlewareFunc())
-	}
+	v1UtilProtected.Use(middleware.AuthMiddleware())
 	{
 		v1UtilProtected.POST("/export", imageHandler.ExportFiles)
 		v1UtilProtected.POST("/export-all", imageHandler.ExportAllFiles)
@@ -108,9 +104,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 	// Legacy protected routes - also support JWT now
 	legacyV1Protected := router.Group("/v1")
-	if err == nil {
-		legacyV1Protected.Use(jwtMiddleware.MiddlewareFunc())
-	}
+	legacyV1Protected.Use(middleware.AuthMiddleware())
 	{
 		legacyV1Protected.POST("/upload", imageHandler.UploadImage)
 	}

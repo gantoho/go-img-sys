@@ -33,9 +33,11 @@ func (s *Server) Start() {
 		s.logger.Fatal("Failed to create upload directory: %v", err)
 	}
 
-	// Initialize API key manager with default keys
 	keyManager := auth.GetManager()
-	keyManager.InitDefaultKeys()
+	if err := keyManager.LoadFromFile(auth.DefaultStorePath()); err != nil {
+		keyManager.InitDefaultKeys()
+		_ = keyManager.SaveToFile(auth.DefaultStorePath())
+	}
 	go keyManager.CleanupExpiredKeys() // Start background cleanup
 
 	s.logger.Info("API Key Manager initialized with default keys")

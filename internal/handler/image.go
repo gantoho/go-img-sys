@@ -300,28 +300,49 @@ func (h *ImageHandler) HealthCheck(ctx *gin.Context) {
 
 // CreateAPIKey creates a new API key
 func (h *ImageHandler) CreateAPIKey(ctx *gin.Context) {
+	// Default to 7 days for temporary API keys
+	expireDays := 7
+
+	// Try JSON body first (optional)
 	var req struct {
-		ExpireDays int `json:"expire_days" binding:"required"`
+		ExpireDays int `json:"expire_days"`
+	}
+	_ = ctx.ShouldBindJSON(&req)
+	if req.ExpireDays != 0 {
+		expireDays = req.ExpireDays
+	} else {
+		// Try query parameter
+		if v := ctx.Query("expire_days"); v != "" {
+			if d, err := strconv.Atoi(v); err == nil {
+				expireDays = d
+			}
+		} else {
+			// Try form field
+			if v := ctx.PostForm("expire_days"); v != "" {
+				if d, err := strconv.Atoi(v); err == nil {
+					expireDays = d
+				}
+			}
+		}
 	}
 
-	if err := ctx.BindJSON(&req); err != nil {
-		utils.CustomResponse(ctx, http.StatusBadRequest, "invalid request", nil)
-		return
-	}
-
-	if req.ExpireDays < 1 || req.ExpireDays > 365 {
+	// Validate range
+	if expireDays < 1 || expireDays > 365 {
 		utils.CustomResponse(ctx, http.StatusBadRequest, "expire_days must be between 1 and 365", nil)
 		return
 	}
 
 	keyManager := auth.GetManager()
-	plainKey := keyManager.CreateKey("api-key-"+strconv.Itoa(len(keyManager.ListKeys())), req.ExpireDays)
+	plainKey := keyManager.CreateRandomKey(expireDays)
+	keyHash := auth.GenerateKey(plainKey)
+	_ = keyManager.SaveToFile(auth.DefaultStorePath())
 
-	h.logger.Info("New API key created, expires in %d days", req.ExpireDays)
+	h.logger.Info("New API key created, expires in %d days", expireDays)
 
 	utils.SuccessResponse(ctx, map[string]interface{}{
 		"api_key":     plainKey,
-		"expire_days": req.ExpireDays,
+		"key_hash":    keyHash,
+		"expire_days": expireDays,
 		"message":     "API key created successfully. Please save it safely!",
 	})
 }
@@ -353,10 +374,50 @@ func (h *ImageHandler) RevokeAPIKey(ctx *gin.Context) {
 		utils.CustomResponse(ctx, http.StatusNotFound, "API key not found", nil)
 		return
 	}
+	_ = keyManager.SaveToFile(auth.DefaultStorePath())
 
 	h.logger.Info("API key revoked")
 	utils.SuccessResponse(ctx, map[string]string{
 		"message": "API key revoked successfully",
+	})
+}
+
+func (h *ImageHandler) ValidateAPIKey(ctx *gin.Context) {
+	var req struct {
+		APIKey  string `json:"api_key"`
+		KeyHash string `json:"key_hash"`
+	}
+	_ = ctx.ShouldBindJSON(&req)
+	if req.APIKey == "" {
+		req.APIKey = ctx.Query("api_key")
+	}
+	if req.KeyHash == "" {
+		req.KeyHash = ctx.Query("key_hash")
+	}
+	keyManager := auth.GetManager()
+	var valid bool
+	var info *auth.APIKey
+	if req.APIKey != "" {
+		valid = keyManager.ValidateKey(req.APIKey)
+		info = keyManager.GetKeyInfo(req.APIKey)
+	} else if req.KeyHash != "" {
+		valid = keyManager.ValidateKeyHash(req.KeyHash)
+		info = keyManager.GetKeyInfoByHash(req.KeyHash)
+	} else {
+		utils.CustomResponse(ctx, http.StatusBadRequest, "api_key or key_hash required", nil)
+		return
+	}
+	if info == nil {
+		utils.CustomResponse(ctx, http.StatusNotFound, "API key not found", nil)
+		return
+	}
+	utils.SuccessResponse(ctx, map[string]interface{}{
+		"valid":      valid,
+		"active":     info.Active,
+		"is_expired": time.Now().After(info.ExpiresAt),
+		"expires_at": info.ExpiresAt.Unix(),
+		"created_at": info.CreatedAt.Unix(),
+		"key_hash":   info.Key,
 	})
 }
 

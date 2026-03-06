@@ -1,10 +1,17 @@
 package auth
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/gantoho/go-img-sys/pkg/utils"
 )
 
 // APIKey represents an API key with expiration
@@ -34,6 +41,10 @@ func GetManager() *KeyManager {
 	return keyManager
 }
 
+func DefaultStorePath() string {
+	return "configs/api_keys.json"
+}
+
 // GenerateKey generates a new API key hash
 func GenerateKey(plainKey string) string {
 	hash := sha256.Sum256([]byte(plainKey))
@@ -56,6 +67,13 @@ func (km *KeyManager) CreateKey(plainKey string, expireAfterDays int) string {
 	}
 
 	return plainKey // Return plain key only once for user to save
+}
+
+func (km *KeyManager) CreateRandomKey(expireAfterDays int) string {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	plainKey := hex.EncodeToString(b)
+	return km.CreateKey(plainKey, expireAfterDays)
 }
 
 // ValidateKey validates an API key
@@ -99,6 +117,35 @@ func (km *KeyManager) RevokeKey(plainKey string) bool {
 	return true
 }
 
+func (km *KeyManager) SaveToFile(path string) error {
+	km.mu.RLock()
+	defer km.mu.RUnlock()
+	dir := filepath.Dir(path)
+	if err := utils.EnsureDir(dir); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(km.keys, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+func (km *KeyManager) LoadFromFile(path string) error {
+	km.mu.Lock()
+	defer km.mu.Unlock()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var m map[string]*APIKey
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	km.keys = m
+	return nil
+}
+
 // GetKeyInfo returns information about a key
 func (km *KeyManager) GetKeyInfo(plainKey string) *APIKey {
 	km.mu.RLock()
@@ -108,6 +155,27 @@ func (km *KeyManager) GetKeyInfo(plainKey string) *APIKey {
 	return km.keys[hashedKey]
 }
 
+func (km *KeyManager) GetKeyInfoByHash(hashedKey string) *APIKey {
+	km.mu.RLock()
+	defer km.mu.RUnlock()
+	return km.keys[hashedKey]
+}
+
+func (km *KeyManager) ValidateKeyHash(hashedKey string) bool {
+	km.mu.RLock()
+	defer km.mu.RUnlock()
+	apiKey, exists := km.keys[hashedKey]
+	if !exists {
+		return false
+	}
+	if !apiKey.Active {
+		return false
+	}
+	if time.Now().After(apiKey.ExpiresAt) {
+		return false
+	}
+	return true
+}
 // ListKeys returns all keys info (without the actual key hash for security)
 func (km *KeyManager) ListKeys() []map[string]interface{} {
 	km.mu.RLock()
