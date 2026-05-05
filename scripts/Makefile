@@ -16,7 +16,7 @@ help:
 # Build the application
 build:
 	@echo "Building application..."
-	@go build -o image-sys main.go
+	@go build -o image-sys ./cmd/image-sys/
 	@echo "Build complete: image-sys"
 
 # Run the application

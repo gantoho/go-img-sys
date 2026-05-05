@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,13 +11,11 @@ import (
 	"github.com/gantoho/go-img-sys/pkg/utils"
 )
 
-// StatisticsService 统计服务
 type StatisticsService struct {
 	config *config.Config
 	logger *logger.Logger
 }
 
-// NewStatisticsService 创建统计服务
 func NewStatisticsService() *StatisticsService {
 	return &StatisticsService{
 		config: config.GetConfig(),
@@ -24,7 +23,6 @@ func NewStatisticsService() *StatisticsService {
 	}
 }
 
-// FileStats 文件统计信息
 type FileStats struct {
 	TotalFiles      int                   `json:"total_files"`
 	TotalSize       int64                 `json:"total_size"`
@@ -35,7 +33,6 @@ type FileStats struct {
 	LargestFileSize int64                 `json:"largest_file_size"`
 }
 
-// FormatStat 格式统计
 type FormatStat struct {
 	Count      int     `json:"count"`
 	Size       int64   `json:"size"`
@@ -43,22 +40,18 @@ type FormatStat struct {
 	Percentage float64 `json:"percentage"`
 }
 
-// GetStatistics 获取统计信息
-func (s *StatisticsService) GetStatistics() *FileStats {
+func (s *StatisticsService) GetStatistics(ctx context.Context) *FileStats {
 	stats := &FileStats{
 		FormatStats: make(map[string]FormatStat),
 	}
 
 	uploadDir := s.config.File.UploadDir
-
 	var largestSize int64
 
 	filepath.Walk(uploadDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
-
-		// 忽略缩略图
 		if strings.Contains(path, "thumbs") {
 			return nil
 		}
@@ -67,14 +60,12 @@ func (s *StatisticsService) GetStatistics() *FileStats {
 		stats.TotalFiles++
 		stats.TotalSize += size
 
-		// 跟踪最大文件
 		if size > largestSize {
 			largestSize = size
 			stats.LargestFile = filepath.Base(path)
 			stats.LargestFileSize = size
 		}
 
-		// 统计格式
 		ext := strings.ToLower(filepath.Ext(info.Name()))
 		if ext != "" {
 			formatStat := stats.FormatStats[ext]
@@ -82,25 +73,21 @@ func (s *StatisticsService) GetStatistics() *FileStats {
 			formatStat.Size += size
 			stats.FormatStats[ext] = formatStat
 		}
-
 		return nil
 	})
 
-	// 计算平均大小
 	if stats.TotalFiles > 0 {
 		stats.AverageFileSize = stats.TotalSize / int64(stats.TotalFiles)
 	}
 
-	// 格式化大小字符串
 	stats.TotalSizeStr = utils.GetFileSizeFormatted(stats.TotalSize)
 
-	// 计算百分比
-	for fmt, stat := range stats.FormatStats {
+	for fileFmt, stat := range stats.FormatStats {
 		stat.SizeStr = utils.GetFileSizeFormatted(stat.Size)
 		if stats.TotalSize > 0 {
 			stat.Percentage = float64(stat.Size) / float64(stats.TotalSize) * 100
 		}
-		stats.FormatStats[fmt] = stat
+		stats.FormatStats[fileFmt] = stat
 	}
 
 	s.logger.Info("Statistics computed: %d files, %.2f MB total", stats.TotalFiles, float64(stats.TotalSize)/1024/1024)
@@ -108,19 +95,17 @@ func (s *StatisticsService) GetStatistics() *FileStats {
 	return stats
 }
 
-// DiskUsage 磁盘使用情况
 type DiskUsage struct {
 	UsedSpace    int64   `json:"used_space"`
 	UsedSpaceStr string  `json:"used_space_str"`
-	Limit        int64   `json:"limit"` // 设置的限制
+	Limit        int64   `json:"limit"`
 	LimitStr     string  `json:"limit_str"`
 	Percentage   float64 `json:"percentage"`
 }
 
-// GetDiskUsage 获取磁盘使用情况
-func (s *StatisticsService) GetDiskUsage() *DiskUsage {
-	stats := s.GetStatistics()
-	maxSize := s.config.File.MaxSize * 1024 * 1024 // 转换为字节
+func (s *StatisticsService) GetDiskUsage(ctx context.Context) *DiskUsage {
+	stats := s.GetStatistics(ctx)
+	maxSize := s.config.File.MaxSize * 1024 * 1024
 
 	usage := &DiskUsage{
 		UsedSpace:    stats.TotalSize,

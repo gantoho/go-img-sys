@@ -30,7 +30,7 @@ func NewImageHandler() *ImageHandler {
 func (h *ImageHandler) GetImage(ctx *gin.Context) {
 	filename := ctx.Param("filename")
 
-	filepath, err := h.service.GetImageByFilename(filename)
+	filepath, err := h.service.GetImageByFilename(ctx.Request.Context(), filename)
 	if err != nil {
 		utils.ErrorResponse(ctx, err)
 		return
@@ -43,7 +43,7 @@ func (h *ImageHandler) GetImage(ctx *gin.Context) {
 func (h *ImageHandler) ListAllImages(ctx *gin.Context) {
 	hostURL := ctx.Request.Host
 
-	data, err := h.service.GetAllImages(hostURL)
+	data, err := h.service.GetAllImages(ctx.Request.Context(), hostURL)
 	if err != nil {
 		utils.ErrorResponse(ctx, err)
 		return
@@ -56,7 +56,7 @@ func (h *ImageHandler) ListAllImages(ctx *gin.Context) {
 func (h *ImageHandler) ListAllImagesWithMetadata(ctx *gin.Context) {
 	hostURL := ctx.Request.Host
 
-	data, err := h.service.GetAllImagesWithMetadata(hostURL)
+	data, err := h.service.GetAllImagesWithMetadata(ctx.Request.Context(), hostURL)
 	if err != nil {
 		utils.ErrorResponse(ctx, err)
 		return
@@ -86,7 +86,7 @@ func (h *ImageHandler) ListAllImagesPaginated(ctx *gin.Context) {
 		return
 	}
 
-	data, appErr := h.service.GetAllImagesPaginated(hostURL, page, pageSize)
+	data, appErr := h.service.GetAllImagesPaginated(ctx.Request.Context(), hostURL, page, pageSize)
 	if appErr != nil {
 		utils.ErrorResponse(ctx, appErr)
 		return
@@ -97,7 +97,7 @@ func (h *ImageHandler) ListAllImagesPaginated(ctx *gin.Context) {
 
 // GetRandomImage returns a random image filename
 func (h *ImageHandler) GetRandomImage(ctx *gin.Context) {
-	filename, err := h.service.GetRandomImage()
+	filename, err := h.service.GetRandomImage(ctx.Request.Context())
 	if err != nil {
 		utils.ErrorResponse(ctx, err)
 		return
@@ -121,7 +121,7 @@ func (h *ImageHandler) GetRandomImages(ctx *gin.Context) {
 		count = 100 // Limit to 100 images per request
 	}
 
-	images, appErr := h.service.GetRandomImages(hostURL, count)
+	images, appErr := h.service.GetRandomImages(ctx.Request.Context(), hostURL, count)
 	if appErr != nil {
 		utils.ErrorResponse(ctx, appErr)
 		return
@@ -248,7 +248,7 @@ func (h *ImageHandler) SearchImages(ctx *gin.Context) {
 	page, _ := strconv.Atoi(pageStr)
 	pageSize, _ := strconv.Atoi(pageSizeStr)
 
-	data, appErr := h.service.SearchImages(hostURL, filename, minSize, maxSize, fileType, page, pageSize)
+	data, appErr := h.service.SearchImages(ctx.Request.Context(), hostURL, filename, minSize, maxSize, fileType, page, pageSize)
 	if appErr != nil {
 		utils.ErrorResponse(ctx, appErr)
 		return
@@ -261,7 +261,7 @@ func (h *ImageHandler) SearchImages(ctx *gin.Context) {
 func (h *ImageHandler) DeleteImage(ctx *gin.Context) {
 	filename := ctx.Param("filename")
 
-	if err := h.service.DeleteImage(filename); err != nil {
+	if err := h.service.DeleteImage(ctx.Request.Context(), filename); err != nil {
 		utils.ErrorResponse(ctx, err)
 		return
 	}
@@ -287,7 +287,7 @@ func (h *ImageHandler) DeleteImages(ctx *gin.Context) {
 		return
 	}
 
-	result := h.service.DeleteImages(req.Filenames)
+	result := h.service.DeleteImages(ctx.Request.Context(), req.Filenames)
 	utils.SuccessResponse(ctx, result)
 }
 
@@ -421,23 +421,20 @@ func (h *ImageHandler) ValidateAPIKey(ctx *gin.Context) {
 	})
 }
 
-// GetStatistics 获取统计信息
 func (h *ImageHandler) GetStatistics(ctx *gin.Context) {
 	statService := service.NewStatisticsService()
-	stats := statService.GetStatistics()
+	stats := statService.GetStatistics(ctx.Request.Context())
 
 	utils.SuccessResponse(ctx, stats)
 }
 
-// GetDiskUsage 获取磁盘使用情况
 func (h *ImageHandler) GetDiskUsage(ctx *gin.Context) {
 	statService := service.NewStatisticsService()
-	usage := statService.GetDiskUsage()
+	usage := statService.GetDiskUsage(ctx.Request.Context())
 
 	utils.SuccessResponse(ctx, usage)
 }
 
-// ExportFiles 导出多个文件为ZIP
 func (h *ImageHandler) ExportFiles(ctx *gin.Context) {
 	var req struct {
 		Filenames []string `json:"filenames" binding:"required"`
@@ -449,7 +446,7 @@ func (h *ImageHandler) ExportFiles(ctx *gin.Context) {
 	}
 
 	exportService := service.NewExportService()
-	result, err := exportService.ExportMultipleFiles(req.Filenames, "./files")
+	result, err := exportService.ExportMultipleFiles(ctx.Request.Context(), req.Filenames, "./files")
 	if err != nil {
 		utils.CustomResponse(ctx, http.StatusInternalServerError, "export failed", nil)
 		return
@@ -458,10 +455,9 @@ func (h *ImageHandler) ExportFiles(ctx *gin.Context) {
 	utils.SuccessResponse(ctx, result)
 }
 
-// ExportAllFiles 导出所有文件
 func (h *ImageHandler) ExportAllFiles(ctx *gin.Context) {
 	exportService := service.NewExportService()
-	result, err := exportService.ExportAllFiles("./files")
+	result, err := exportService.ExportAllFiles(ctx.Request.Context(), "./files")
 	if err != nil {
 		utils.CustomResponse(ctx, http.StatusInternalServerError, "export failed", nil)
 		return
@@ -470,7 +466,6 @@ func (h *ImageHandler) ExportAllFiles(ctx *gin.Context) {
 	utils.SuccessResponse(ctx, result)
 }
 
-// Cleanup 执行清理操作
 func (h *ImageHandler) Cleanup(ctx *gin.Context) {
 	var req struct {
 		RemoveOrphanThumbnails bool `json:"remove_orphan_thumbnails"`
@@ -487,10 +482,10 @@ func (h *ImageHandler) Cleanup(ctx *gin.Context) {
 	maintService := service.NewMaintenanceService()
 	maxAge := time.Duration(req.MaxFileAgeDays) * 24 * time.Hour
 	if maxAge == 0 {
-		maxAge = 24 * time.Hour * 30 // 默认30天
+		maxAge = 24 * time.Hour * 30
 	}
 
-	result := maintService.Cleanup(service.CleanupConfig{
+	result := maintService.Cleanup(ctx.Request.Context(), service.CleanupConfig{
 		RemoveOrphanThumbnails: req.RemoveOrphanThumbnails,
 		RemoveOldFiles:         req.RemoveOldFiles,
 		MaxFileAge:             maxAge,
@@ -500,7 +495,7 @@ func (h *ImageHandler) Cleanup(ctx *gin.Context) {
 	utils.SuccessResponse(ctx, result)
 }
 
-// StartThumbnailGeneration 为现有图片生成缩略图
+// StartThumbnailGeneration triggers thumbnail generation for existing images
 func (h *ImageHandler) StartThumbnailGeneration(ctx *gin.Context) {
 	filenames := ctx.Query("filenames")
 

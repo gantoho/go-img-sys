@@ -22,7 +22,6 @@ type JWTManager struct {
 
 var jwtManager *JWTManager
 
-// InitJWTManager initializes the JWT manager
 func InitJWTManager(secretKey string, duration time.Duration) {
 	jwtManager = &JWTManager{
 		secretKey: secretKey,

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"math/rand"
 	"mime/multipart"
 	"os"
@@ -51,7 +52,7 @@ func NewImageService() *ImageService {
 }
 
 // GetImageByFilename retrieves a single image by filename
-func (s *ImageService) GetImageByFilename(filename string) (string, *errors.AppError) {
+func (s *ImageService) GetImageByFilename(ctx context.Context, filename string) (string, *errors.AppError) {
 	filepath := utils.GetUploadPath(s.config.File.UploadDir, filename)
 
 	if !utils.FileExists(filepath) {
@@ -63,7 +64,7 @@ func (s *ImageService) GetImageByFilename(filename string) (string, *errors.AppE
 }
 
 // GetAllImages returns all image files with their URLs
-func (s *ImageService) GetAllImages(hostURL string) (*ImageData, *errors.AppError) {
+func (s *ImageService) GetAllImages(ctx context.Context, hostURL string) (*ImageData, *errors.AppError) {
 	fileInfos, err := utils.ListFiles(s.config.File.UploadDir)
 	if err != nil {
 		s.logger.Error("Failed to list files: %v", err)
@@ -89,7 +90,7 @@ func (s *ImageService) GetAllImages(hostURL string) (*ImageData, *errors.AppErro
 }
 
 // GetAllImagesWithMetadata returns all image files with detailed metadata
-func (s *ImageService) GetAllImagesWithMetadata(hostURL string) ([]ImageMetaData, *errors.AppError) {
+func (s *ImageService) GetAllImagesWithMetadata(ctx context.Context, hostURL string) ([]ImageMetaData, *errors.AppError) {
 	fileInfos, err := utils.ListFiles(s.config.File.UploadDir)
 	if err != nil {
 		s.logger.Error("Failed to list files: %v", err)
@@ -118,7 +119,7 @@ func (s *ImageService) GetAllImagesWithMetadata(hostURL string) ([]ImageMetaData
 }
 
 // GetAllImagesPaginated returns paginated image files with metadata
-func (s *ImageService) GetAllImagesPaginated(hostURL string, page, pageSize int) (*PaginatedImageData, *errors.AppError) {
+func (s *ImageService) GetAllImagesPaginated(ctx context.Context, hostURL string, page, pageSize int) (*PaginatedImageData, *errors.AppError) {
 	if page < 1 {
 		page = 1
 	}
@@ -196,7 +197,7 @@ func (s *ImageService) paginateFiles(fileInfos []os.FileInfo, hostURL string, pa
 }
 
 // GetRandomImage returns a random image filename
-func (s *ImageService) GetRandomImage() (string, *errors.AppError) {
+func (s *ImageService) GetRandomImage(ctx context.Context) (string, *errors.AppError) {
 	fileInfos, err := utils.ListFiles(s.config.File.UploadDir)
 	if err != nil {
 		s.logger.Error("Failed to list files: %v", err)
@@ -223,7 +224,7 @@ func (s *ImageService) GetRandomImage() (string, *errors.AppError) {
 }
 
 // GetRandomImages returns multiple random images
-func (s *ImageService) GetRandomImages(hostURL string, count int) ([]string, *errors.AppError) {
+func (s *ImageService) GetRandomImages(ctx context.Context, hostURL string, count int) ([]string, *errors.AppError) {
 	fileInfos, err := utils.ListFiles(s.config.File.UploadDir)
 	if err != nil {
 		s.logger.Error("Failed to list files: %v", err)
@@ -255,7 +256,7 @@ func (s *ImageService) GetRandomImages(hostURL string, count int) ([]string, *er
 }
 
 // UploadFile uploads a file to the server
-func (s *ImageService) UploadFile(hostURL string, files []*multipart.FileHeader) (map[string]interface{}, *errors.AppError) {
+func (s *ImageService) UploadFile(ctx context.Context, hostURL string, files []*multipart.FileHeader) (map[string]interface{}, *errors.AppError) {
 	if len(files) == 0 {
 		return nil, errors.NewError(400, "no files provided")
 	}
@@ -302,7 +303,7 @@ func (s *ImageService) UploadFile(hostURL string, files []*multipart.FileHeader)
 }
 
 // SearchImages filters images by criteria
-func (s *ImageService) SearchImages(hostURL string, filename string, minSize, maxSize int64, fileType string, page, pageSize int) (*PaginatedImageData, *errors.AppError) {
+func (s *ImageService) SearchImages(ctx context.Context, hostURL string, filename string, minSize, maxSize int64, fileType string, page, pageSize int) (*PaginatedImageData, *errors.AppError) {
 	if page < 1 {
 		page = 1
 	}
@@ -402,7 +403,7 @@ func (s *ImageService) validateFile(file *multipart.FileHeader) *errors.AppError
 }
 
 // DeleteImage deletes a single image file
-func (s *ImageService) DeleteImage(filename string) *errors.AppError {
+func (s *ImageService) DeleteImage(ctx context.Context, filename string) *errors.AppError {
 	if !utils.IsValidImageFormat(filename) {
 		return errors.NewError(400, "invalid filename format")
 	}
@@ -426,12 +427,12 @@ func (s *ImageService) DeleteImage(filename string) *errors.AppError {
 }
 
 // DeleteImages deletes multiple image files
-func (s *ImageService) DeleteImages(filenames []string) map[string]interface{} {
+func (s *ImageService) DeleteImages(ctx context.Context, filenames []string) map[string]interface{} {
 	deleted := make([]string, 0)
 	failed := make([]map[string]string, 0)
 
 	for _, filename := range filenames {
-		if err := s.DeleteImage(filename); err != nil {
+		if err := s.DeleteImage(ctx, filename); err != nil {
 			failed = append(failed, map[string]string{
 				"filename": filename,
 				"error":    err.Message,

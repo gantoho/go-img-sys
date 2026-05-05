@@ -12,7 +12,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o image-sys main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o image-sys ./cmd/image-sys/
 
 # Final stage
 FROM alpine:latest

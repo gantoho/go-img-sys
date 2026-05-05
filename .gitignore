@@ -48,6 +48,14 @@ air.log
 
 # 环境和配置
 .env
+
+# 运行时数据
+/files/
+/logs/
+/configs/
+
+# IDE 编辑器备份
+*.bak
 .env.local
 .env.*.local
 .env.production.local

@@ -188,7 +188,7 @@ func (km *KeyManager) ListKeys() []map[string]interface{} {
 			"expires_at": apiKey.ExpiresAt.Unix(),
 			"active":     apiKey.Active,
 			"is_expired": time.Now().After(apiKey.ExpiresAt),
-			"key_hash":   apiKey.Key[:16] + "...", // Show partial hash only
+			"key_hash":   apiKey.Key[:16] + "...",
 		})
 	}
 	return result

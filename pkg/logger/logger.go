@@ -116,7 +116,7 @@ func (l *Logger) Fatal(msg string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.fatal.Printf(msg+"\n", args...)
-	os.Exit(1)
+	panic(msg)
 }
 
 func (l *Logger) Close() error {

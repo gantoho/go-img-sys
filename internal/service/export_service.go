@@ -2,6 +2,7 @@ package service
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,13 +14,11 @@ import (
 	"github.com/gantoho/go-img-sys/pkg/logger"
 )
 
-// ExportService 导出服务
 type ExportService struct {
 	config *config.Config
 	logger *logger.Logger
 }
 
-// NewExportService 创建导出服务
 func NewExportService() *ExportService {
 	return &ExportService{
 		config: config.GetConfig(),
@@ -27,7 +26,6 @@ func NewExportService() *ExportService {
 	}
 }
 
-// ExportResult 导出结果
 type ExportResult struct {
 	ZipPath    string `json:"zip_path"`
 	FileCount  int    `json:"file_count"`
@@ -36,18 +34,15 @@ type ExportResult struct {
 	Compressed bool   `json:"compressed"`
 }
 
-// ExportMultipleFiles 导出多个文件为ZIP
-func (e *ExportService) ExportMultipleFiles(filenames []string, outputDir string) (*ExportResult, error) {
+func (e *ExportService) ExportMultipleFiles(ctx context.Context, filenames []string, outputDir string) (*ExportResult, error) {
 	if len(filenames) == 0 {
 		e.logger.Warn("No files to export")
 		return nil, fmt.Errorf("no files provided")
 	}
 
-	// 生成ZIP文件名
 	zipName := "export_" + getCurrentTimestamp() + ".zip"
 	zipPath := filepath.Join(outputDir, zipName)
 
-	// 创建ZIP文件
 	zipFile, err := os.Create(zipPath)
 	if err != nil {
 		e.logger.Error("Failed to create zip file: %v", err)
@@ -65,9 +60,15 @@ func (e *ExportService) ExportMultipleFiles(filenames []string, outputDir string
 	uploadDir := e.config.File.UploadDir
 
 	for _, filename := range filenames {
+		select {
+		case <-ctx.Done():
+			e.logger.Warn("Export cancelled: %v", ctx.Err())
+			return nil, ctx.Err()
+		default:
+		}
+
 		filePath := filepath.Join(uploadDir, filename)
 
-		// 安全检查：防止路径遍历
 		absPath, _ := filepath.Abs(filePath)
 		absUploadDir, _ := filepath.Abs(uploadDir)
 		if !strings.HasPrefix(absPath, absUploadDir) {
@@ -75,21 +76,18 @@ func (e *ExportService) ExportMultipleFiles(filenames []string, outputDir string
 			continue
 		}
 
-		// 检查文件是否存在
 		fileInfo, err := os.Stat(filePath)
 		if err != nil || fileInfo.IsDir() {
 			e.logger.Warn("File not found or is directory: %s", filePath)
 			continue
 		}
 
-		// 打开文件
 		file, err := os.Open(filePath)
 		if err != nil {
 			e.logger.Error("Failed to open file %s: %v", filePath, err)
 			continue
 		}
 
-		// 添加到ZIP
 		header, err := zip.FileInfoHeader(fileInfo)
 		if err != nil {
 			file.Close()
@@ -123,36 +121,29 @@ func (e *ExportService) ExportMultipleFiles(filenames []string, outputDir string
 	return result, nil
 }
 
-// ExportAllFiles 导出所有文件
-func (e *ExportService) ExportAllFiles(outputDir string) (*ExportResult, error) {
+func (e *ExportService) ExportAllFiles(ctx context.Context, outputDir string) (*ExportResult, error) {
 	uploadDir := e.config.File.UploadDir
 
-	// 获取所有文件
 	var filenames []string
 	filepath.Walk(uploadDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
-
-		// 忽略缩略图
 		if strings.Contains(path, "thumbs") {
 			return nil
 		}
-
 		rel, _ := filepath.Rel(uploadDir, path)
 		filenames = append(filenames, rel)
 		return nil
 	})
 
-	return e.ExportMultipleFiles(filenames, outputDir)
+	return e.ExportMultipleFiles(ctx, filenames, outputDir)
 }
 
-// getCurrentTimestamp 获取当前时间戳格式字符串
 func getCurrentTimestamp() string {
 	return time.Now().Format("20060102_150405")
 }
 
-// getFileSizeStr 获取格式化的文件大小
 func getFileSizeStr(size int64) string {
 	const (
 		Byte     = 1

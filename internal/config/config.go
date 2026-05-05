@@ -27,10 +27,10 @@ type FileConfig struct {
 	DuplicateStrategy string
 }
 
-var AppConfig *Config
+var appConfig *Config
 
 func Init() *Config {
-	AppConfig = &Config{
+	appConfig = &Config{
 		Server: ServerConfig{
 			Port:    ":3128",
 			Env:     "development",
@@ -47,12 +47,12 @@ func Init() *Config {
 			JWTExpire: 24 * time.Hour,
 		},
 	}
-	return AppConfig
+	return appConfig
 }
 
 func GetConfig() *Config {
-	if AppConfig == nil {
+	if appConfig == nil {
 		return Init()
 	}
-	return AppConfig
+	return appConfig
 }
