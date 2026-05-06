@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gantoho/go-img-sys/internal/config"
 	"github.com/gantoho/go-img-sys/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
-// RateLimiter implements token bucket algorithm
 type RateLimiter struct {
 	mu              sync.RWMutex
 	requestsPerSec  int
@@ -17,44 +17,46 @@ type RateLimiter struct {
 	tokens          map[string]float64
 	lastRefill      map[string]time.Time
 	concurrent      map[string]int
+	stopCh          chan struct{}
 }
 
-// NewRateLimiter creates a new rate limiter
 func NewRateLimiter(requestsPerSec, concurrentLimit int) *RateLimiter {
-	return &RateLimiter{
+	rl := &RateLimiter{
 		requestsPerSec:  requestsPerSec,
 		concurrentLimit: concurrentLimit,
 		tokens:          make(map[string]float64),
 		lastRefill:      make(map[string]time.Time),
 		concurrent:      make(map[string]int),
+		stopCh:          make(chan struct{}),
 	}
+	go rl.cleanup()
+	return rl
 }
 
-// Allow checks if a request from the given IP is allowed
+func (rl *RateLimiter) Stop() {
+	close(rl.stopCh)
+}
+
 func (rl *RateLimiter) Allow(ip string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	now := time.Now()
 
-	// Check concurrent connections
 	if rl.concurrent[ip] >= rl.concurrentLimit {
 		return false
 	}
 
-	// Initialize if first request from this IP
 	if _, exists := rl.tokens[ip]; !exists {
 		rl.tokens[ip] = float64(rl.requestsPerSec)
 		rl.lastRefill[ip] = now
 		rl.concurrent[ip] = 0
 	}
 
-	// Refill tokens based on elapsed time
 	elapsed := now.Sub(rl.lastRefill[ip]).Seconds()
 	rl.tokens[ip] = min(float64(rl.requestsPerSec), rl.tokens[ip]+elapsed*float64(rl.requestsPerSec))
 	rl.lastRefill[ip] = now
 
-	// Check if token is available
 	if rl.tokens[ip] >= 1 {
 		rl.tokens[ip]--
 		rl.concurrent[ip]++
@@ -64,13 +66,35 @@ func (rl *RateLimiter) Allow(ip string) bool {
 	return false
 }
 
-// Release decrements the concurrent counter
 func (rl *RateLimiter) Release(ip string) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	if count, exists := rl.concurrent[ip]; exists && count > 0 {
 		rl.concurrent[ip]--
+	}
+}
+
+func (rl *RateLimiter) cleanup() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-rl.stopCh:
+			return
+		case <-ticker.C:
+			rl.mu.Lock()
+			threshold := time.Now().Add(-30 * time.Minute)
+			for ip, last := range rl.lastRefill {
+				if last.Before(threshold) {
+					delete(rl.tokens, ip)
+					delete(rl.lastRefill, ip)
+					delete(rl.concurrent, ip)
+				}
+			}
+			rl.mu.Unlock()
+		}
 	}
 }
 
@@ -81,10 +105,13 @@ func min(a, b float64) float64 {
 	return b
 }
 
-var rateLimiter = NewRateLimiter(100, 10) // 100 requests/sec, 10 concurrent connections per IP
+var rateLimiter *RateLimiter
 
-// RateLimitMiddleware applies rate limiting to requests
 func RateLimitMiddleware() gin.HandlerFunc {
+	cfg := config.GetConfig()
+	if rateLimiter == nil {
+		rateLimiter = NewRateLimiter(cfg.Rate.RequestsPerSec, cfg.Rate.ConcurrentLimit)
+	}
 	return func(ctx *gin.Context) {
 		ip := ctx.ClientIP()
 

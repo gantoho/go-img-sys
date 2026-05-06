@@ -1,0 +1,13 @@
+.git/
+.gitignore
+docs/
+files/
+logs/
+configs/
+*.md
+*.bat
+*.sh
+.air.toml
+.DS_Store
+.vscode/
+.idea/

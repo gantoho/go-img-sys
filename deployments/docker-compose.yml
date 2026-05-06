@@ -2,12 +2,14 @@ version: '3.8'
 
 services:
   image-sys:
-    build: .
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
     ports:
       - "3128:3128"
     volumes:
-      - ./files:/root/files
-      - ./logs:/root/logs
+      - ./files:/app/files
+      - ./logs:/app/logs
     environment:
       - GIN_MODE=release
     restart: unless-stopped

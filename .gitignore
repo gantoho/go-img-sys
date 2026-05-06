@@ -58,6 +58,11 @@ air.log
 *.bak
 .env.local
 .env.*.local
+
+# 自动生成的 Swagger/OpenAPI 文件
+/docs/docs.go
+/docs/swagger.yaml
+/docs/swagger.json
 .env.production.local
 configs/api_keys.json
 

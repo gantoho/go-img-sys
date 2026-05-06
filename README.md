@@ -1,352 +1,474 @@
 # Go Image System
 
-一个使用Go语言和Gin框架开发的高效图片管理系统。遵循Go官方推荐的标准项目结构。
+使用 Go 语言和 Gin 框架开发的高效图片管理系统，遵循 Go 官方推荐的标准项目结构。
 
-## 🚀 快速开始
+## 特性
 
-### 编译
-```bash
-go build -o build/image-sys.exe ./cmd/image-sys
+- **图片管理** — 上传、查询（列表/分页/搜索/随机）、删除（单张/批量）
+- **图片处理** — 缩略图生成（Catmull-Rom 高质量缩放）、旋转、尺寸调整
+- **文件导出** — 按需或全量导出为 ZIP，支持路径遍历防护
+- **磁盘清理** — 孤立缩略图清理、过期文件删除、空目录清理
+- **统计分析** — 文件数量/大小统计、格式分布、磁盘使用率
+- **多层认证** — API Key（SHA256 + 过期/撤销） + JWT（可选）
+- **并发安全** — 限流（令牌桶，100 req/s + 10并发/IP，支持环境变量配置）、并发安全的缓存
+- **缓存机制** — 内存缓存（TTL + 自动清理 + 优雅关闭）+ fsnotify 文件监听自动失效
+- **监控指标** — Prometheus 端点 `/metrics`（HTTP 请求数/延迟/并发、磁盘用量、文件数）
+- **统一响应** — 标准 JSON 格式，含版本号、时间戳、请求耗时
+- **日志系统** — 分级日志（DEBUG/INFO/WARN/ERROR/FATAL），lumberjack 自动轮转（按大小/时间）
+- **断点续传** — 分片上传三步 API：init → upload chunk → complete
+- **配置热加载** — POST `/api/v1/system/reload` 运行时重载配置
+- **Docker 支持** — 多阶段构建 + 非 root 用户，docker-compose 一键部署
+
+## 项目结构
+
+```
+go-img-sys/
+├── api/                    # API 测试脚本
+│   └── api.http
+├── cmd/
+│   └── image-sys/
+│       └── main.go         # 程序入口
+├── deployments/            # 部署配置
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── docs/
+│   └── CODE_REVIEW_OPTIMIZATION.md  # 代码审查与优化记录
+├── internal/               # 私有包（不对外导出）
+│   ├── app/server.go       # 应用启动与依赖组装
+│   ├── config/config.go    # 配置管理
+│   ├── handler/image.go    # HTTP 处理器
+│   ├── middleware/          # 中间件（CORS/限流/JWT/认证/计时）
+│   ├── router/router.go    # 路由注册
+│   └── service/             # 业务逻辑层
+│       ├── image_service.go
+│       ├── export_service.go
+│       ├── maintenance_service.go
+│       └── statistics_service.go
+├── pkg/                    # 公共库（可被外部导入）
+│   ├── auth/               # API Key + JWT 认证
+│   ├── cache/              # 内存缓存（TTL + 自动清理）
+│   ├── errors/             # 统一错误定义
+│   ├── imageutil/          # 图片处理（缩放/旋转/缩略图）
+│   ├── logger/             # 分级日志
+│   └── utils/              # 文件工具 + 统一响应
+├── scripts/                # 构建脚本
+│   ├── Makefile
+│   ├── build.bat
+│   └── build.sh
+├── .air.toml               # 热加载配置
+├── .gitignore
+├── go.mod / go.sum
+├── openapi.yaml            # OpenAPI 规范
+└── README.md
 ```
 
-### 运行
-```bash
-./build/image-sys.exe
-```
+## 快速开始
 
-### 使用构建脚本
+### 环境要求
+
+- Go >= 1.23
+
+> **国内网络用户**：如果遇到 `proxy.golang.org` 超时，请设置 Go 模块代理：
+> ```powershell
+> # PowerShell
+> $env:GOPROXY="https://goproxy.cn,direct"
+> # 或永久设置
+> go env -w GOPROXY=https://goproxy.cn,direct
+> ```
+
+### 编译与运行
+
 ```bash
+# 编译
+go build -o image-sys ./cmd/image-sys/
+
+# 运行
+./image-sys
+
+# 或使用构建脚本
 # Windows
-.\scripts\build.bat build
 .\scripts\build.bat run
 
 # Linux/Mac
 ./scripts/build.sh run
 
-# 或使用Makefile
+# Makefile
 cd scripts && make run
 ```
 
-### Docker运行
+### 热加载开发
+
 ```bash
-docker-compose -f deployments/docker-compose.yml up
+# 安装 air 后（make dev 会自动安装）
+cd scripts && make dev
 ```
 
-## 📚 文档
-
-所有文档位于 `docs/` 目录：
-- [README.md](docs/README.md) - 完整项目文档
-- [QUICKSTART.md](docs/QUICKSTART.md) - 快速开始指南
-- [QUICK_START_GUIDE.md](docs/QUICK_START_GUIDE.md) - 详细API使用指南
-- [FEATURES_SUMMARY.md](docs/FEATURES_SUMMARY.md) - 功能完善总结
-- [IMPROVEMENTS.md](docs/IMPROVEMENTS.md) - 改进详情
-- [CLEANUP_REPORT.md](docs/CLEANUP_REPORT.md) - 清理报告
-
-## 📁 项目结构
-
-按照Go官方推荐的标准结构组织 (golang-standards/project-layout)：
-
-```
-├── api/                    # API文档和规范
-├── build/                  # 编译输出 (gitignored)
-├── cmd/
-│   └── image-sys/         # 可执行程序入口
-│       └── main.go        # 程序主入口
-├── configs/               # 配置文件
-├── deployments/           # Docker和部署配置
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── docs/                  # 文档
-├── internal/              # 私有包 (不对外导出)
-│   ├── app/              # 应用核心
-│   ├── config/           # 配置管理
-│   ├── handler/          # HTTP处理器
-│   ├── middleware/       # 中间件
-│   ├── router/           # 路由
-│   └── service/          # 业务逻辑
-├── pkg/                   # 公共包 (可被导入)
-│   ├── errors/           # 错误定义
-│   ├── logger/           # 日志系统
-│   └── utils/            # 工具函数
-├── scripts/              # 构建脚本
-│   ├── build.bat
-│   ├── build.sh
-│   └── Makefile
-├── tests/                # 集成测试
-├── files/                # 上传文件存储
-├── logs/                 # 日志文件 (gitignored)
-├── .air.toml             # 热加载配置
-├── .gitignore
-├── go.mod
-├── go.sum
-└── README.md
-```
-
-## 🔗 API端点
-
-### 新API (推荐)
-```
-GET  /api/v1/health              # 健康检查
-GET  /api/v1/images              # 获取所有图片
-GET  /api/v1/images/metadata     # 获取图片元数据
-GET  /api/v1/images/paginated    # 分页查询图片
-GET  /api/v1/images/search       # 搜索/过滤图片
-GET  /api/v1/images/random       # 获取随机图片
-GET  /api/v1/images/random/:num  # 获取N个随机图片
-POST /api/v1/images/upload       # 上传图片 (需密钥)
-DELETE /api/v1/images/:filename  # 删除图片 (需密钥)
-POST /api/v1/images/delete       # 批量删除 (需密钥)
-POST /api/v1/admin/api-keys      # 创建新密钥 (需认证)
-GET  /api/v1/admin/api-keys      # 查看密钥 (需认证)
-DELETE /api/v1/admin/api-keys    # 撤销密钥 (需认证)
-GET  /f/:filename                # 直接获取文件
-```
-
-### 遗留API (向后兼容)
-```
-GET  /v1/                   # 健康检查
-GET  /v1/all                # 获取所有图片
-GET  /v1/bgimg              # 获取随机图片
-GET  /v1/get/:number        # 获取N个随机图片
-POST /v1/upload             # 上传图片 (需密钥)
-```
-
-## ✨ 项目特性
-
-- ✅ 标准Go项目结构（遵循golang-standards）
-- ✅ 清晰的分层架构 (Config/Service/Handler)
-- ✅ 完整的错误处理机制
-- ✅ 完善的日志系统（DEBUG/INFO/WARN/ERROR/FATAL）
-- ✅ 跨域资源共享 (CORS) 支持
-- ✅ Docker容器化支持
-- ✅ 热加载开发支持
-- ✅ 向后兼容的API端点
-- ✅ **图片格式验证** (jpg, png, gif, webp, bmp, ico, svg)
-- ✅ **分页查询** (支持自定义页数和大小)
-- ✅ **图片搜索和过滤** (按名称、大小、类型)
-- ✅ **上传进度跟踪**
-- ✅ **内存缓存机制** (TTL + 自动清理)
-- ✅ **分级日志系统** (可配置日志级别)
-- ✅ **统一API响应格式** (含元数据和耗时)
-- ✅ **请求限流** (100请求/秒，10并发/IP)
-- ✅ **图片元数据返回** (大小、MIME类型、修改时间)
-- ✅ **批量删除功能**
-- ✅ **API密钥认证系统** (SHA256加密、过期机制)
-
-# go-img-sys — Go 图片管理系统
-
-一个用 Go (Gin) 编写的轻量级图片管理与分发服务，提供上传、查询、导出、清理、APIKey 管理等功能，适合小到中型图片存储场景和自托管部署。
-
-本 README 覆盖项目结构、构建运行、配置项、API 列表、认证机制、部署与常见故障排查（含 Apifox 使用提示）。
-
---
-
-## 主要特性
-
-- 多种图片读取接口：列表 / 分页 / 搜索 / 随机值
-- 文件上传（支持多文件、进度与冲突策略）
-- 批量删除、按条件清理与导出为 ZIP
-- 基于 API Key 的访问控制（SHA256 存储 + 过期/撤销）
-- 日志系统（文件与 stdout，分级）
-- 内置限流、中间件（CORS、耗时统计、速率限制）
-- Docker 化与 docker-compose 支持
-
---
-
-## 项目布局（重要路径）
-
-- `cmd/image-sys` — 可执行入口（`main.go`）
-- `internal/app` — 应用启动、配置与依赖初始化
-- `internal/router` — 路由注册（API 路径在这里定义）
-- `internal/handler` — HTTP 处理器（核心业务接口实现）
-- `internal/service` — 业务逻辑实现（文件管理、导出等）
-- `internal/config` — 默认配置（端口、上传目录、重复文件策略）
-- `internal/middleware` — 认证、限流、CORS、计时等中间件
-- `pkg/auth` — API Key 管理（生成/校验/默认 key）
-- `pkg/logger` — 日志初始化与封装
-- `pkg/utils` — 常用工具（路径、文件判断、统一响应）
-- `deployments/` — `Dockerfile` 与 `docker-compose.yml`
-- `api/api.http` — REST 测试示例（REST Client / curl 参考）
-
-上传文件存储目录：默认 `./files`（可在配置中修改）。日志目录：`./logs`。
-
---
-
-## 快速开始（本地）
-
-1. 克隆仓库并进入项目根目录
-
-2. 编译（Windows 示例）：
-
-```powershell
-go build -o build/image-sys.exe ./cmd/image-sys
-```
-
-3. 运行：
-
-```powershell
-./build/image-sys.exe
-```
-
-4. 默认服务监听：`:3128`，控制台会打印初始化信息（包括默认开发用 API keys）。
-
-脚本支持：`.\scripts\build.bat`（Windows）或 `./scripts/build.sh`（Unix）。
-
---
-
-## 使用 Docker
-
-构建镜像并启动（在项目根目录）：
+### Docker 运行
 
 ```bash
 docker-compose -f deployments/docker-compose.yml up --build -d
 ```
 
-这会把 `./files` 与 `./logs` 映射到容器内 `/root/files` 和 `/root/logs`。
+## 配置
 
---
+默认配置位于 `internal/config/config.go`，支持通过**环境变量**和**命令行参数**覆盖。
 
-## 配置说明
+### 配置项
 
-默认配置位于 `internal/config/config.go`，主要字段：
+| 字段 | 环境变量 | 默认值 | 说明 |
+|------|---------|--------|------|
+| `Server.Port` | `SERVER_PORT` | `:3128` | 服务端口 |
+| `Server.Env` | `SERVER_ENV` | `development` | 运行环境（development/release）|
+| `Server.Timeout` | `SERVER_TIMEOUT` | `30` | 超时时间（秒） |
+| `File.UploadDir` | `UPLOAD_DIR` | `./files` | 上传目录 |
+| `File.MaxSize` | `MAX_FILE_SIZE` | `100` | 单文件最大大小（MB） |
+| `File.DuplicateStrategy` | `DUPLICATE_STRATEGY` | `rename` | 重名策略 |
+| `Auth.JWTSecret` | `JWT_SECRET` | `change-me-in-production` | JWT 签名密钥 |
+| `Rate.RequestsPerSec` | `RATE_LIMIT_REQUESTS` | `100` | 每秒请求限制 |
+| `Rate.ConcurrentLimit` | `RATE_LIMIT_CONCURRENT` | `10` | 每 IP 并发限制 |
 
-- `Server.Port`：服务端口（默认 `:3128`）
-- `Server.Env`：运行环境（`development` / `release`）
-- `File.UploadDir`：上传目录（默认 `./files`）
-- `File.MaxSize`：单文件最大大小（MB，默认 `100`）
-- `File.AllowTypes`：允许的 MIME 类型列表
-- `File.DuplicateStrategy`：文件重名处理策略（`overwrite`、`rename`、`reject`；默认 `rename`）
-
-示例（修改 `internal/config/config.go` 后重启生效）：
-
-```go
-AppConfig.File.DuplicateStrategy = "overwrite"
-```
-
-DuplicateStrategy 行为说明：
-
-- `rename`（默认）：若存在则生成 `name_1.ext`、`name_2.ext`... 直到找到未被占用的名称。
-- `overwrite`：直接覆盖已存在文件。
-- `reject`：返回失败并在响应里列出被拒绝的文件。
-
---
-
-## API 概览（重要端点）
-
-注意：受保护的写操作需要带 API Key（`X-API-Key` header 或 `api_key` query）。
-
-常用端点：
-
-- GET  `/api/v1/health` — 健康检查
-- GET  `/api/v1/images` — 列表所有图片（返回带 URL 的数据）
-- GET  `/api/v1/images/metadata` — 返回包含元数据的列表
-- GET  `/api/v1/images/paginated` — 分页查询（`page` / `page_size`）
-- GET  `/api/v1/images/search` — 按名称/大小/类型搜索（支持 `filename`, `min_size`, `max_size`, `type` 等查询）
-- GET  `/api/v1/images/random` — 随机图片（文本返回文件名或 URL）
-- GET  `/api/v1/images/random/:number` — 获取 N 个随机图片（最大 100）
-- POST `/api/v1/images/upload` — 上传（multipart/form-data，字段名 `files`，受保护）
-- DELETE `/api/v1/images/:filename` — 删除单个文件（受保护）
-- POST `/api/v1/images/delete` — 批量删除（JSON body: { "filenames": [...] }，受保护）
-
-管理类（API Key 管理，受保护）：
-
-- POST `/api/v1/admin/api-keys` — 创建 API Key（body: {"expire_days": <int>}）
-- GET  `/api/v1/admin/api-keys` — 列出 Key 信息（不返回明文）
-- DELETE `/api/v1/admin/api-keys` — 撤销 Key（body: {"api_key": "<plain>"}）
-
-直接文件访问：
-
-- GET `/f/:filename` — 直接从 `UploadDir` 返回文件。
-
-兼容旧路径（向后兼容）：`/v1/*` 系列接口也存在以支持历史客户端。
-
-更多请求示例见 `api/api.http`。
-
---
-
-## 认证（API Key）
-
-实现概要：
-
-- 客户端需要在请求中提供明文 API Key（Header `X-API-Key` 或 query `api_key`）。
-- 服务端使用 SHA256 对明文 Key 散列后与内存中存储的哈希值比对（见 `pkg/auth/keymanager.go`）。
-- Key 支持过期与撤销。
-- 启动时会初始化两个开发用默认 Key（仅用于快速本地测试）：
-    - `demo-key-12345`（30 天）
-    - `test-key-67890`（7 天）
-
-示例（curl）：
+### 命令行参数
 
 ```bash
-# 使用 Header
-curl -H "X-API-Key: demo-key-12345" -F "files=@/path/to/img.jpg" http://localhost:3128/api/v1/images/upload
+# 指定端口
+go run ./cmd/image-sys/ --port :8080
 
-# 使用 query（不推荐在浏览器地址栏暴露）
-curl -F "files=@/path/to/img.jpg" "http://localhost:3128/api/v1/images/upload?api_key=demo-key-12345"
+# 指定运行环境
+go run ./cmd/image-sys/ --env release
+
+# 组合使用
+go run ./cmd/image-sys/ --port :8080 --env release
 ```
 
-Apifox / Postman 使用提示：
+### 环境变量覆盖（最高优先级）
 
-- 在 Apifox 中不要直接把 `{{apiKey}}` 放到 header 而不在环境中定义。请在 Apifox 的 Environment 中创建 `apiKey` 并填入实际值（例如 `demo-key-12345`），或者直接在请求头里使用明文值测试。
+```bash
+# Windows PowerShell
+$env:SERVER_PORT=":8080"
+$env:SERVER_ENV="release"
+$env:JWT_SECRET="my-secure-key"
+$env:MAX_FILE_SIZE="200"
+go run ./cmd/image-sys/
 
---
+# Linux/Mac
+SERVER_PORT=:8080 SERVER_ENV=release JWT_SECRET=my-secure-key go run ./cmd/image-sys/
+```
 
-## 文件上传行为
+**优先级顺序**：硬编码默认值 < 环境变量 < 命令行参数
 
-- HTTP 表单字段名：`files`（支持多文件）
-- 限制：单文件大小受 `File.MaxSize` 控制（单位 MB）
-- 重名冲突由 `DuplicateStrategy` 控制（见上文）
-- 成功响应包含已上传文件的 `filename`, `size`, `url` 等信息；失败文件会被列在 `failed` 字段中
+**重名策略（DuplicateStrategy）**：
+- `rename`（默认）— 自动重命名为 `name_1.ext`、`name_2.ext` …
+- `overwrite` — 直接覆盖
+- `reject` — 拒绝并返回错误
 
-示例响应结构（成功/部分失败）：
+## API 端点
 
+### 公开接口（无需认证）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/health` | 健康检查（含磁盘空间检测） |
+| GET | `/api/v1/images` | 图片列表（URL） |
+| GET | `/api/v1/images/metadata` | 图片列表（含元数据） |
+| GET | `/api/v1/images/paginated?page=1&page_size=20` | 分页查询 |
+| GET | `/api/v1/images/search?filename=&min_size=&max_size=&type=` | 搜索/过滤 |
+| GET | `/api/v1/images/random` | 随机一张 |
+| GET | `/api/v1/images/random/:number` | 随机 N 张（最多 100，Fisher-Yates 无重复） |
+| GET | `/api/v1/util/statistics` | 文件统计 |
+| GET | `/api/v1/util/disk-usage` | 磁盘使用情况 |
+| POST | `/api/v1/system/reload` | 配置热加载 |
+| GET | `/metrics` | Prometheus 监控指标 |
+| GET | `/f/:filename` | 直接获取文件 |
+
+### 受保护接口（需 API Key）
+
+在 Header 中传入 `X-API-Key` 或 Query 传入 `api_key`。
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/images/upload` | 上传图片（multipart, 字段 `files`） |
+| DELETE | `/api/v1/images/:filename` | 删除单张 |
+| POST | `/api/v1/images/delete` | 批量删除 |
+| POST | `/api/v1/images/upload/chunk/init` | 初始化分片上传 |
+| POST | `/api/v1/images/upload/chunk` | 上传分片 |
+| POST | `/api/v1/images/upload/chunk/complete` | 完成分片合并 |
+| POST | `/api/v1/util/export` | 导出为 ZIP |
+| POST | `/api/v1/util/export-all` | 全量导出 |
+| POST | `/api/v1/util/cleanup` | 磁盘清理 |
+| POST | `/api/v1/util/generate-thumbnails` | 生成缩略图（后台异步） |
+| POST | `/api/v1/system/reload` | 配置热加载 |
+
+### 管理接口（需 API Key + Admin）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/admin/api-keys` | 列出 API Key |
+| DELETE | `/api/v1/admin/api-keys` | 撤销 API Key |
+| POST | `/api/v1/admin/api-keys` | 创建 API Key |
+
+### JWT 认证
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/auth/login` | 登录获取 JWT |
+| POST | `/api/auth/refresh` | 刷新 JWT |
+
+### 遗留 API（向后兼容）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/v1/` | 健康检查 |
+| GET | `/v1/all` | 所有图片 |
+| GET | `/v1/bgimg` | 随机图片 |
+| GET | `/v1/get/:number` | 随机 N 张 |
+| POST | `/v1/upload` | 上传 |
+
+更多请求示例见 [api/api.http](api/api.http)。
+
+## 新增特性
+
+### 📊 Prometheus 监控
+
+启动服务后访问 `http://localhost:3128/metrics`，暴露指标：
+
+| 指标 | 类型 | 说明 |
+|------|------|------|
+| `http_requests_total` | Counter | HTTP 请求总数（按 method/path/status 细分） |
+| `http_request_duration_seconds` | Histogram | HTTP 请求延迟分布 |
+| `http_requests_in_flight` | Gauge | 当前正在处理的请求数 |
+| `image_upload_total` | Counter | 图片上传总数 |
+| `image_delete_total` | Counter | 图片删除总数 |
+| `disk_usage_percent` | Gauge | 当前磁盘使用率 |
+| `file_count` | Gauge | 当前存储文件数 |
+
+### 📦 断点续传（分片上传）
+
+适用于大文件上传场景，三步完成：
+
+```bash
+# 1. 初始化上传会话
+curl -X POST http://localhost:3128/api/v1/images/upload/chunk/init \
+  -H "X-API-Key: demo-key-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"large.mp4","file_size":"104857600"}'
+
+# 2. 上传分片（重复调用，chunk_index 从 0 开始）
+curl -X POST http://localhost:3128/api/v1/images/upload/chunk \
+  -H "X-API-Key: demo-key-12345" \
+  -F "upload_id=xxx" \
+  -F "chunk_index=0" \
+  -F "file=@chunk_0.bin"
+
+# 3. 完成合并
+curl -X POST http://localhost:3128/api/v1/images/upload/chunk/complete \
+  -H "X-API-Key: demo-key-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"upload_id":"xxx"}'
+```
+
+### ⚙️ 配置热加载
+
+运行时重载环境变量配置，无需重启服务：
+
+```bash
+curl -X POST http://localhost:3128/api/v1/system/reload \
+  -H "X-API-Key: demo-key-12345"
+```
+
+### 🖼️ 缩略图生成
+
+为已有图片后台异步生成缩略图（200x200，Catmull-Rom 高质量缩放）：
+
+```bash
+curl -X POST "http://localhost:3128/api/v1/util/generate-thumbnails?filenames=image1.jpg,image2.png" \
+  -H "X-API-Key: demo-key-12345"
+```
+
+缩略图存放在 `{uploadDir}/thumbs/` 目录下。
+
+## 认证
+
+### API Key
+
+- Key 使用 SHA256 哈希存储
+- 支持过期时间和手动撤销
+- 服务启动时自动初始化默认 Key（仅开发用）：
+  - `demo-key-12345`（30 天有效期）
+  - `test-key-67890`（7 天有效期）
+
+```bash
+# 使用 Header 传 Key
+curl -H "X-API-Key: demo-key-12345" \
+  -F "files=@/path/to/img.jpg" \
+  http://localhost:3128/api/v1/images/upload
+
+# 或使用 Query 参数
+curl -F "files=@/path/to/img.jpg" \
+  "http://localhost:3128/api/v1/images/upload?api_key=demo-key-12345"
+```
+
+### JWT
+
+支持通过用户名密码获取 JWT Token：
+
+```bash
+curl -X POST http://localhost:3128/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+```
+
+默认账号：`admin/admin123`（管理员）、`user/user123`（普通用户）。
+
+## 图片上传
+
+- 表单字段名：`files`（支持多文件）
+- 单文件大小受 `File.MaxSize` 限制
+- 重名冲突处理由 `DuplicateStrategy` 控制
+
+响应示例：
 ```json
 {
+  "code": 200,
+  "message": "success",
+  "data": {
     "message": "Upload completed",
     "total_files": 2,
-    "total_uploaded": 1,
-    "uploaded": [{"filename":"a.jpg","url":"localhost:3128/f/a.jpg","size":12345}],
-    "failed": [{"filename":"b.jpg","error":"file already exists"}]
+    "total_uploaded": 2,
+    "uploaded": [
+      {"index": 1, "filename": "a.jpg", "size": 12345, "url": "localhost:3128/f/a.jpg", "progress": 100}
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "timestamp": 1714512345,
+    "duration_ms": 123
+  }
 }
 ```
 
---
+## 图片处理
 
-## 日志与监控
+依赖 `golang.org/x/image` 实现高质量图片处理：
 
-- 日志目录：`./logs`，错误会写入 `logs/error.log`，普通信息输出到 stdout。
-- 日志分级：`DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`（可通过 `pkg/logger` 调整）
+- **缩略图生成** — Catmull-Rom 插值算法，保持宽高比
+- **图片旋转** — 支持 90°/180°/270° 像素级旋转
+- **尺寸调整** — 指定宽高的高质量缩放
 
---
+## 日志
 
-## 部署与运维注意
+- 标准输出：所有级别（可配置最低级别）
+- 错误日志文件：`logs/error.log`（仅 ERROR / FATAL）
+- 日志分级：DEBUG < INFO < WARN < ERROR < FATAL
 
-- 确保 `files` 与 `logs` 目录对运行用户可写。
-- 生产环境应替换默认 API Key 并移除开发演示 Key。
-- 建议在反向代理（如 Nginx）前端做 TLS 终止并限制请求体大小。
+通过 `logger.SetLogLevel()` 可动态调整日志级别。
 
---
+## 部署
 
-## 常见问题（FAQ）
+### 生产环境注意事项
 
-- Apifox 返回 401 且你确认服务端有默认 Key：通常是因为在 Apifox 请求头里使用了未定义的变量（例如 `{{apiKey}}` 未在 Environment 中设置）。解决方案：在 Apifox 环境中添加 `apiKey` 变量或直接填入明文 Key。
-- Windows PowerShell 的 `curl` 可能映射到 `Invoke-WebRequest`，请使用 `curl.exe` 或在 Git Bash / WSL 中使用原生 curl。
+1. **替换默认 API Key** — 在 `pkg/auth/keymanager.go` 中移除开发用 Key
+2. **修改 JWT Secret** — 在 `internal/config/config.go` 中修改 `Auth.JWTSecret`
+3. **使用反向代理** — 建议在 Nginx 前端做 TLS 终止
+4. **目录权限** — 确保 `files/` 和 `logs/` 目录可写
 
---
+### Docker 部署
 
-## 开发者与贡献
+```bash
+# 构建并启动
+docker-compose -f deployments/docker-compose.yml up --build -d
 
-欢迎提交 Issue 与 PR。主要代码在 `internal/` 下，公共库在 `pkg/` 下。提交前请保证：
+# 查看日志
+docker-compose -f deployments/docker-compose.yml logs -f
+```
 
-- 按需运行 `go fmt` 与 `go vet`。
-- 新功能加入对应单元/集成测试（若可能）。
+## 开发
 
---
+```bash
+# 格式化
+go fmt ./...
 
-## 许可证
+# 静态检查
+go vet ./...
 
-本项目仓库当前未包含 LICENSE 文件。请在需要开源许可时添加合适的 `LICENSE`。
+# 构建验证
+go build ./...
 
---
+# 运行
+$env:GOPROXY="https://goproxy.cn,direct"  # 国内网络需要
+go run ./cmd/image-sys/
+```
 
-如果你希望我把 README 中的某一部分扩展为示例脚本（例如详细的上传 curl 测试、Apifox 环境导入片段或 Docker 部署步骤），告诉我需要的部分，我会补充示例并把它加入到仓库中。
+## FAQ
+
+**Q: 启动时报 `proxy.golang.org` 连接超时？**
+A: 国内网络环境下，设置 Go 代理为 `https://goproxy.cn,direct`。
+
+**Q: 上传返回 401 Unauthorized？**
+A: 请求头中缺少 `X-API-Key` 或 Key 已过期。开发环境可用 `demo-key-12345`。
+
+**Q: 构建时报 `main.go: no such file`？**
+A: 请使用 `./cmd/image-sys/` 路径编译，而不是 `main.go`。
+
+**Q: 如何修改监听端口？**
+A: 修改 `internal/config/config.go` 中的 `Server.Port` 后重新编译。
+
+## OpenAPI 规范与 Swagger UI
+
+项目通过 **swaggo/swag** 注解自动生成 OpenAPI 规范，并提供运行时 Swagger UI 界面。
+
+### 访问 Swagger UI
+
+启动服务后，在浏览器访问：
+
+```
+http://localhost:3128/swagger/index.html
+```
+
+### 生成方式
+
+OpenAPI 规范通过代码注释自动生成，**新增或修改路由后需要重新生成**。
+
+**触发方式（任选其一）：**
+
+```bash
+# 方式 1：go generate（先安装 swag CLI）
+go install github.com/swaggo/swag/cmd/swag@latest
+go generate ./...
+
+# 方式 2：Makefile
+cd scripts && make openapi
+
+# 方式 3：直接运行 swag CLI
+swag init -g cmd/image-sys/main.go -o docs --parseDependency --parseInternal
+```
+
+### 生成文件
+
+执行生成后，`docs/` 目录下会输出三个文件：
+
+| 文件 | 说明 |
+|------|------|
+| `docs/swagger.yaml` | OpenAPI 3.0 YAML 格式规范 |
+| `docs/swagger.json` | OpenAPI 3.0 JSON 格式规范 |
+| `docs/docs.go` | 嵌入二进制的 Go 文件（供 gin-swagger 运行时使用） |
+
+### 注解位置
+
+Swagger 注解写在 handler 函数上方，与代码逻辑在一起：
+
+```
+internal/handler/image.go  ← 所有 API 端点的注解
+cmd/image-sys/main.go      ← 全局 API 信息（标题、版本、认证方式等）
+```
+
+### 认证方式声明
+
+- **API Key** — 在 Swagger UI 中点击右上角 `Authorize`，输入 `X-API-Key`
+- **JWT** — 先调用 `/api/auth/login` 获取 Token，然后在 Authorize 中输入 `Bearer <token>`
+
+> **注意**：原有的 `openapi.yaml`（手动维护版本）已被自动生成的 `docs/swagger.yaml` 取代。请勿手动编辑 `openapi.yaml`，所有 API 变更应修改 handler 函数中的 Swagger 注解后重新生成。
+
+## 相关文档
+
+- [CODE_REVIEW_OPTIMIZATION.md](docs/CODE_REVIEW_OPTIMIZATION.md) — 代码审查与规范优化记录
+- [api/api.http](api/api.http) — API 测试示例

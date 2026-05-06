@@ -1,4 +1,4 @@
-.PHONY: help build run clean test docker-build docker-run
+.PHONY: help build run dev clean test fmt lint docker-build docker-run deps info openapi generate swag-install
 
 # Default target
 help:
@@ -10,6 +10,9 @@ help:
 	@echo "  make test          - Run tests"
 	@echo "  make fmt           - Format code"
 	@echo "  make lint          - Run linter"
+	@echo "  make openapi       - Generate OpenAPI spec (requires swag CLI)"
+	@echo "  make generate      - Run all code generators (go generate)"
+	@echo "  make swag-install  - Install swag CLI"
 	@echo "  make docker-build  - Build Docker image"
 	@echo "  make docker-run    - Run Docker container"
 
@@ -74,3 +77,21 @@ info:
 	@echo "Project: Go Image System"
 	@echo "Language: Go $(shell go version | cut -d' ' -f3)"
 	@echo "Module: github.com/gantoho/go-img-sys"
+
+# Install swag CLI for OpenAPI spec generation
+swag-install:
+	@echo "Installing swag CLI..."
+	@which swag > /dev/null 2>&1 || go install github.com/swaggo/swag/cmd/swag@latest
+	@echo "swag CLI installed"
+
+# Generate OpenAPI spec from Swagger annotations
+openapi: swag-install
+	@echo "Generating OpenAPI spec..."
+	@swag init -g cmd/image-sys/main.go -o docs --parseDependency --parseInternal
+	@echo "OpenAPI spec generated: docs/swagger.yaml, docs/swagger.json"
+
+# Run all code generators
+generate:
+	@echo "Running go generate..."
+	@go generate ./...
+	@echo "Code generation complete"

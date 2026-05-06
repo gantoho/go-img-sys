@@ -2,12 +2,17 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"math/rand"
 	"mime/multipart"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gantoho/go-img-sys/internal/config"
 	"github.com/gantoho/go-img-sys/pkg/cache"
 	"github.com/gantoho/go-img-sys/pkg/errors"
@@ -242,14 +247,17 @@ func (s *ImageService) GetRandomImages(ctx context.Context, hostURL string, coun
 		return nil, errors.ErrNoFiles
 	}
 
+	rand.Shuffle(len(validFiles), func(i, j int) {
+		validFiles[i], validFiles[j] = validFiles[j], validFiles[i]
+	})
+
 	if count > len(validFiles) {
 		count = len(validFiles)
 	}
 
 	result := make([]string, 0, count)
 	for i := 0; i < count; i++ {
-		randomIndex := rand.Intn(len(validFiles))
-		result = append(result, hostURL+"/f/"+validFiles[randomIndex].Name())
+		result = append(result, hostURL+"/f/"+validFiles[i].Name())
 	}
 
 	return result, nil
@@ -285,8 +293,8 @@ func (s *ImageService) UploadFile(ctx context.Context, hostURL string, files []*
 		// Note: In production, you should handle file name conflicts
 		uploadedFiles = append(uploadedFiles, hostURL+"/f/"+file.Filename)
 
-		// Save file using Gin's method would require gin.Context
-		// For now, we'll prepare the path but need gin.Context in handler
+		// Invalidate cache after upload
+		s.cache.Delete("images_list")
 	}
 
 	result := map[string]interface{}{
@@ -453,4 +461,165 @@ func (s *ImageService) DeleteImages(ctx context.Context, filenames []string) map
 	}
 
 	return result
+}
+
+// InvalidateCache clears the internal image list cache
+func (s *ImageService) InvalidateCache() {
+	s.cache.Delete("images_list")
+}
+
+// chunkSession tracks a chunked upload session
+type chunkSession struct {
+	Filename string
+	FileSize int64
+	Chunks   int
+	Dir      string
+}
+
+var (
+	chunkMu      sync.RWMutex
+	chunkSessions = make(map[string]*chunkSession)
+)
+
+// InitChunkUpload initializes a chunked upload session
+func (s *ImageService) InitChunkUpload(ctx context.Context, filename string, fileSize int64) (string, *errors.AppError) {
+	b := make([]byte, 16)
+	rand.Read(b)
+	uploadID := fmt.Sprintf("%x", b)
+
+	chunkDir := filepath.Join(s.config.File.UploadDir, ".chunks", uploadID)
+	if err := os.MkdirAll(chunkDir, 0755); err != nil {
+		s.logger.Error("Failed to create chunk dir: %v", err)
+		return "", errors.NewErrorWithCause(500, "failed to create chunk directory", err)
+	}
+
+	session := &chunkSession{
+		Filename: filename,
+		FileSize: fileSize,
+		Dir:      chunkDir,
+	}
+
+	chunkMu.Lock()
+	chunkSessions[uploadID] = session
+	chunkMu.Unlock()
+
+	s.logger.Info("Chunk upload initialized: %s -> %s (%d bytes)", uploadID, filename, fileSize)
+	return uploadID, nil
+}
+
+// SaveChunk saves a chunk of data
+func (s *ImageService) SaveChunk(ctx context.Context, uploadID string, chunkIndex int, reader io.Reader) *errors.AppError {
+	chunkMu.RLock()
+	session, ok := chunkSessions[uploadID]
+	chunkMu.RUnlock()
+	if !ok {
+		return errors.NewError(404, "upload session not found")
+	}
+
+	chunkPath := filepath.Join(session.Dir, fmt.Sprintf("chunk_%05d", chunkIndex))
+	out, err := os.Create(chunkPath)
+	if err != nil {
+		s.logger.Error("Failed to create chunk file: %v", err)
+		return errors.NewErrorWithCause(500, "failed to create chunk file", err)
+	}
+	defer out.Close()
+
+	written, err := io.Copy(out, reader)
+	if err != nil {
+		s.logger.Error("Failed to write chunk: %v", err)
+		return errors.NewErrorWithCause(500, "failed to write chunk", err)
+	}
+
+	chunkMu.Lock()
+	session.Chunks++
+	chunkMu.Unlock()
+
+	s.logger.Info("Chunk saved: %s [%d] (%d bytes)", uploadID, chunkIndex, written)
+	return nil
+}
+
+// CompleteChunkUpload merges all chunks into the final file
+func (s *ImageService) CompleteChunkUpload(ctx context.Context, uploadID string) (map[string]interface{}, *errors.AppError) {
+	chunkMu.Lock()
+	session, ok := chunkSessions[uploadID]
+	if !ok {
+		chunkMu.Unlock()
+		return nil, errors.NewError(404, "upload session not found")
+	}
+	delete(chunkSessions, uploadID)
+	chunkMu.Unlock()
+
+	hostURL := ""
+	if rv := ctx.Value("host"); rv != nil {
+		hostURL = rv.(string)
+	}
+
+	finalPath := filepath.Join(s.config.File.UploadDir, session.Filename)
+	finalFile, err := os.Create(finalPath)
+	if err != nil {
+		s.logger.Error("Failed to create final file: %v", err)
+		return nil, errors.NewErrorWithCause(500, "failed to create final file", err)
+	}
+	defer finalFile.Close()
+
+	var totalSize int64
+	for i := 0; ; i++ {
+		chunkPath := filepath.Join(session.Dir, fmt.Sprintf("chunk_%05d", i))
+		if _, err := os.Stat(chunkPath); os.IsNotExist(err) {
+			break
+		}
+		data, err := os.ReadFile(chunkPath)
+		if err != nil {
+			s.logger.Error("Failed to read chunk %s: %v", chunkPath, err)
+			continue
+		}
+		if _, err := finalFile.Write(data); err != nil {
+			s.logger.Error("Failed to write to final file: %v", err)
+			continue
+		}
+		totalSize += int64(len(data))
+		os.Remove(chunkPath)
+	}
+
+	os.RemoveAll(session.Dir)
+	s.logger.Info("Chunk upload complete: %s -> %s (%d bytes)", uploadID, session.Filename, totalSize)
+
+	return map[string]interface{}{
+		"filename":   session.Filename,
+		"size":       totalSize,
+		"url":        hostURL + "/f/" + session.Filename,
+	}, nil
+}
+
+// WatchFileChanges starts watching the upload directory for changes
+func (s *ImageService) WatchFileChanges(ctx context.Context) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer watcher.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op&(fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
+					s.cache.Delete("images_list")
+					s.logger.Debug("Cache invalidated due to file change: %s", event.Name)
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				s.logger.Error("File watcher error: %v", err)
+			}
+		}
+	}()
+
+	return watcher.Add(s.config.File.UploadDir)
 }

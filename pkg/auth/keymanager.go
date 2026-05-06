@@ -203,7 +203,7 @@ func (km *KeyManager) CleanupExpiredKeys() {
 		km.mu.Lock()
 		now := time.Now()
 		for key, apiKey := range km.keys {
-			if now.After(apiKey.ExpiresAt) && !apiKey.Active {
+			if now.After(apiKey.ExpiresAt) {
 				delete(km.keys, key)
 			}
 		}

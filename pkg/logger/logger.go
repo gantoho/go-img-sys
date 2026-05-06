@@ -1,12 +1,14 @@
 package logger
 
 import (
+	"io"
 	"log"
 	"os"
 	"sync"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// LogLevel represents the log level
 type LogLevel int
 
 const (
@@ -17,6 +19,24 @@ const (
 	FATAL
 )
 
+type Config struct {
+	Filename   string
+	MaxSize    int
+	MaxBackups int
+	MaxAge     int
+	Compress   bool
+	Level      LogLevel
+}
+
+var DefaultConfig = Config{
+	Filename:   "logs/error.log",
+	MaxSize:    100,
+	MaxBackups: 7,
+	MaxAge:     30,
+	Compress:   true,
+	Level:      INFO,
+}
+
 type Logger struct {
 	debug   *log.Logger
 	info    *log.Logger
@@ -24,36 +44,43 @@ type Logger struct {
 	err     *log.Logger
 	fatal   *log.Logger
 	level   LogLevel
-	errFile *os.File
+	closers []io.Closer
 	mu      sync.Mutex
 }
 
 var instance *Logger
 
 func Init() *Logger {
+	return InitWithConfig(DefaultConfig)
+}
+
+func InitWithConfig(cfg Config) *Logger {
 	if instance != nil {
 		return instance
 	}
 
-	// Create logs directory if not exists
 	if _, err := os.Stat("logs"); os.IsNotExist(err) {
 		os.Mkdir("logs", 0755)
 	}
 
-	// Open error log file
-	errFile, err := os.OpenFile("logs/error.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatal(err)
+	stdoutWriter := os.Stdout
+
+	errWriter := &lumberjack.Logger{
+		Filename:   cfg.Filename,
+		MaxSize:    cfg.MaxSize,
+		MaxBackups: cfg.MaxBackups,
+		MaxAge:     cfg.MaxAge,
+		Compress:   cfg.Compress,
 	}
 
 	instance = &Logger{
-		debug:   log.New(os.Stdout, "[DEBUG] ", log.LstdFlags),
-		info:    log.New(os.Stdout, "[INFO] ", log.LstdFlags),
-		warn:    log.New(os.Stdout, "[WARN] ", log.LstdFlags),
-		err:     log.New(errFile, "[ERROR] ", log.LstdFlags),
-		fatal:   log.New(errFile, "[FATAL] ", log.LstdFlags),
-		level:   INFO, // Default to INFO level
-		errFile: errFile,
+		debug:   log.New(stdoutWriter, "[DEBUG] ", log.LstdFlags|log.Lmicroseconds),
+		info:    log.New(stdoutWriter, "[INFO] ", log.LstdFlags|log.Lmicroseconds),
+		warn:    log.New(io.MultiWriter(stdoutWriter, errWriter), "[WARN] ", log.LstdFlags|log.Lmicroseconds),
+		err:     log.New(errWriter, "[ERROR] ", log.LstdFlags|log.Lmicroseconds),
+		fatal:   log.New(errWriter, "[FATAL] ", log.LstdFlags|log.Lmicroseconds),
+		level:   cfg.Level,
+		closers: []io.Closer{errWriter},
 	}
 
 	return instance
@@ -66,14 +93,12 @@ func GetLogger() *Logger {
 	return instance
 }
 
-// SetLogLevel sets the logging level
 func (l *Logger) SetLogLevel(level LogLevel) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.level = level
 }
 
-// GetLogLevel returns the current logging level
 func (l *Logger) GetLogLevel() LogLevel {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -120,5 +145,8 @@ func (l *Logger) Fatal(msg string, args ...interface{}) {
 }
 
 func (l *Logger) Close() error {
-	return l.errFile.Close()
+	for _, c := range l.closers {
+		c.Close()
+	}
+	return nil
 }

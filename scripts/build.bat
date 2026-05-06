@@ -16,7 +16,7 @@ if "%1"=="" (
 
 if "%1"=="build" (
     echo Building application...
-    go build -o image-sys.exe main.go
+    go build -o image-sys.exe .\cmd\image-sys\
     if !errorlevel! equ 0 (
         echo Build successful: image-sys.exe
     ) else (
@@ -53,5 +53,5 @@ if "%1"=="help" (
 goto :eof
 
 :build
-go build -o image-sys.exe main.go
+go build -o image-sys.exe .\cmd\image-sys\
 exit /b !errorlevel!

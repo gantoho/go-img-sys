@@ -17,7 +17,7 @@ usage() {
 
 build() {
     echo "Building application..."
-    go build -o image-sys main.go
+    go build -o image-sys ./cmd/image-sys/
     echo "Build successful: image-sys"
 }
 
