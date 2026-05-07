@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,20 @@ var SupportedImageFormats = map[string]string{
 	".bmp":  "image/bmp",
 	".ico":  "image/x-icon",
 	".svg":  "image/svg+xml",
+}
+
+// GetRequestBaseURL returns the full base URL (scheme + host) from an HTTP request.
+// It checks X-Forwarded-Proto header for reverse proxy support, then TLS,
+// and falls back to http.
+func GetRequestBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if fwd := r.Header.Get("X-Forwarded-Proto"); fwd == "https" || fwd == "http" {
+		scheme = fwd
+	}
+	return scheme + "://" + r.Host
 }
 
 // EnsureDir creates directory if not exists

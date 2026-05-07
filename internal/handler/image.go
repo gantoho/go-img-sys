@@ -57,7 +57,7 @@ func (h *ImageHandler) GetImage(ctx *gin.Context) {
 // @Success      200 {object} utils.Response{data=service.ImageData} "图片列表"
 // @Router       /api/v1/images [get]
 func (h *ImageHandler) ListAllImages(ctx *gin.Context) {
-	hostURL := ctx.Request.Host
+	hostURL := utils.GetRequestBaseURL(ctx.Request)
 
 	data, err := h.service.GetAllImages(ctx.Request.Context(), hostURL)
 	if err != nil {
@@ -76,7 +76,7 @@ func (h *ImageHandler) ListAllImages(ctx *gin.Context) {
 // @Success      200 {object} utils.Response{data=object} "含元数据的图片列表"
 // @Router       /api/v1/images/metadata [get]
 func (h *ImageHandler) ListAllImagesWithMetadata(ctx *gin.Context) {
-	hostURL := ctx.Request.Host
+	hostURL := utils.GetRequestBaseURL(ctx.Request)
 
 	data, err := h.service.GetAllImagesWithMetadata(ctx.Request.Context(), hostURL)
 	if err != nil {
@@ -100,7 +100,7 @@ func (h *ImageHandler) ListAllImagesWithMetadata(ctx *gin.Context) {
 // @Success      200 {object} utils.Response{data=service.PaginatedImageData} "分页结果"
 // @Router       /api/v1/images/paginated [get]
 func (h *ImageHandler) ListAllImagesPaginated(ctx *gin.Context) {
-	hostURL := ctx.Request.Host
+	hostURL := utils.GetRequestBaseURL(ctx.Request)
 	pageStr := ctx.DefaultQuery("page", "1")
 	pageSizeStr := ctx.DefaultQuery("page_size", "20")
 
@@ -151,7 +151,7 @@ func (h *ImageHandler) GetRandomImage(ctx *gin.Context) {
 // @Success      200 {object} utils.Response{data=object} "随机图片列表"
 // @Router       /api/v1/images/random/{number} [get]
 func (h *ImageHandler) GetRandomImages(ctx *gin.Context) {
-	hostURL := ctx.Request.Host
+	hostURL := utils.GetRequestBaseURL(ctx.Request)
 	countStr := ctx.Param("number")
 
 	count, err := strconv.Atoi(countStr)
@@ -188,7 +188,7 @@ func (h *ImageHandler) GetRandomImages(ctx *gin.Context) {
 // @Security     ApiKeyAuth
 // @Router       /api/v1/images/upload [post]
 func (h *ImageHandler) UploadImage(ctx *gin.Context) {
-	hostURL := ctx.Request.Host
+	hostURL := utils.GetRequestBaseURL(ctx.Request)
 
 	form, err := ctx.MultipartForm()
 	if err != nil {
@@ -299,7 +299,7 @@ func (h *ImageHandler) UploadImage(ctx *gin.Context) {
 // @Success      200 {object} utils.Response{data=service.PaginatedImageData} "搜索结果"
 // @Router       /api/v1/images/search [get]
 func (h *ImageHandler) SearchImages(ctx *gin.Context) {
-	hostURL := ctx.Request.Host
+	hostURL := utils.GetRequestBaseURL(ctx.Request)
 	filename := ctx.DefaultQuery("filename", "")
 	minSizeStr := ctx.DefaultQuery("min_size", "0")
 	maxSizeStr := ctx.DefaultQuery("max_size", "0")
