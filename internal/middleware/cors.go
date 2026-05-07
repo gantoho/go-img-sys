@@ -16,7 +16,6 @@ func CORSMiddleware() gin.HandlerFunc {
 		ctx.Header("Access-Control-Allow-Headers", "*")
 		ctx.Header("Access-Control-Allow-Methods", "GET,HEAD,POST,PUT,DELETE,OPTIONS,PATCH")
 		ctx.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
-		ctx.Header("Content-Type", "application/json")
 
 		if method == "OPTIONS" {
 			ctx.AbortWithStatus(http.StatusNoContent)
