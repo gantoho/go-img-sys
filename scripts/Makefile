@@ -16,8 +16,8 @@ help:
 	@echo "  make docker-build  - Build Docker image"
 	@echo "  make docker-run    - Run Docker container"
 
-# Build the application
-build:
+# Build the application (with OpenAPI spec generation)
+build: openapi
 	@echo "Building application..."
 	@go build -o image-sys ./cmd/image-sys/
 	@echo "Build complete: image-sys"

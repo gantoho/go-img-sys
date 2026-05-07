@@ -1,13 +1,18 @@
 package router
 
 import (
+	"io"
+	"strings"
+
 	"github.com/gantoho/go-img-sys/internal/config"
 	"github.com/gantoho/go-img-sys/internal/handler"
 	"github.com/gantoho/go-img-sys/internal/middleware"
 	"github.com/gantoho/go-img-sys/pkg/auth"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/swaggo/swag"
+
+	_ "github.com/gantoho/go-img-sys/docs"
 )
 
 func RegisterRoutes(router *gin.Engine) {
@@ -19,12 +24,68 @@ func RegisterRoutes(router *gin.Engine) {
 }
 
 func registerRoutes(router *gin.Engine, imageHandler *handler.ImageHandler, jwtManager *auth.JWTManager) {
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
 	router.Use(middleware.RequestTimingMiddleware())
 	router.Use(middleware.PrometheusMiddleware())
 	router.Use(middleware.RateLimitMiddleware())
 	router.Use(middleware.CORSMiddleware())
+
+	router.GET("/swagger/*any", func(c *gin.Context) {
+		path := c.Param("any")
+
+		if path == "/doc.json" {
+			doc, err := swag.ReadDoc()
+			if err != nil {
+				c.String(500, "swagger doc error: %v", err)
+				return
+			}
+			c.Data(200, "application/json; charset=utf-8", []byte(doc))
+			return
+		}
+
+		filePath := path
+		if filePath == "" || filePath == "/" {
+			filePath = "/index.html"
+		}
+
+		contentType := "text/plain"
+		switch {
+		case strings.HasSuffix(filePath, ".html"):
+			contentType = "text/html; charset=utf-8"
+		case strings.HasSuffix(filePath, ".js"):
+			contentType = "application/javascript; charset=utf-8"
+		case strings.HasSuffix(filePath, ".css"):
+			contentType = "text/css; charset=utf-8"
+		case strings.HasSuffix(filePath, ".png"):
+			contentType = "image/png"
+		case strings.HasSuffix(filePath, ".ico"):
+			contentType = "image/x-icon"
+		case strings.HasSuffix(filePath, ".map"):
+			contentType = "application/json"
+		case strings.HasSuffix(filePath, ".json"):
+			contentType = "application/json; charset=utf-8"
+		}
+
+		data, err := swaggerFiles.HTTP.Open("swagger-ui" + filePath)
+		if err != nil {
+			// Try without swagger-ui prefix
+			data, err2 := swaggerFiles.HTTP.Open("." + filePath)
+			if err2 != nil {
+				c.String(404, "Not Found: swagger-ui%v (also tried: .%v)", filePath, filePath)
+				return
+			}
+			defer data.Close()
+			content, _ := io.ReadAll(data)
+			c.Data(200, contentType, content)
+			return
+		}
+		defer data.Close()
+		content, err := io.ReadAll(data)
+		if err != nil {
+			c.String(500, "read error: %v", err)
+			return
+		}
+		c.Data(200, contentType, content)
+	})
 
 	router.GET("/metrics", middleware.PrometheusHandler())
 

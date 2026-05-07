@@ -414,7 +414,12 @@ A: 修改 `internal/config/config.go` 中的 `Server.Port` 后重新编译。
 
 ## OpenAPI 规范与 Swagger UI
 
-项目通过 **swaggo/swag** 注解自动生成 OpenAPI 规范，并提供运行时 Swagger UI 界面。
+项目通过 **swaggo/swag** 注解自动生成 OpenAPI 规范，提供两个运行时端点：
+
+| 端点 | 说明 |
+|------|------|
+| `/swagger/index.html` | Swagger UI 可视化浏览接口 |
+| `/swagger/doc.json` | OpenAPI JSON 规范（供 Swagger UI 加载） |
 
 ### 访问 Swagger UI
 
@@ -431,12 +436,12 @@ OpenAPI 规范通过代码注释自动生成，**新增或修改路由后需要�
 **触发方式（任选其一）：**
 
 ```bash
-# 方式 1：go generate（先安装 swag CLI）
+# 方式 1：Makefile（推荐，会自动安装 swag CLI）
+cd scripts && make build           # make build 已自动包含 openapi 生成
+
+# 方式 2：go generate
 go install github.com/swaggo/swag/cmd/swag@latest
 go generate ./...
-
-# 方式 2：Makefile
-cd scripts && make openapi
 
 # 方式 3：直接运行 swag CLI
 swag init -g cmd/image-sys/main.go -o docs --parseDependency --parseInternal
@@ -450,7 +455,9 @@ swag init -g cmd/image-sys/main.go -o docs --parseDependency --parseInternal
 |------|------|
 | `docs/swagger.yaml` | OpenAPI 3.0 YAML 格式规范 |
 | `docs/swagger.json` | OpenAPI 3.0 JSON 格式规范 |
-| `docs/docs.go` | 嵌入二进制的 Go 文件（供 gin-swagger 运行时使用） |
+| `docs/docs.go` | 嵌入二进制的 Go 代码（通过 `init()` 注册到 `swag` 包，运行时由 `/swagger/doc.json` 渲染） |
+
+> 注意：`docs/docs.go` 需要在 `internal/router/router.go` 中通过 `_ "github.com/gantoho/go-img-sys/docs"` 导入，`init()` 函数才会执行并注册 API 定义。
 
 ### 注解位置
 
@@ -465,6 +472,14 @@ cmd/image-sys/main.go      ← 全局 API 信息（标题、版本、认证方�
 
 - **API Key** — 在 Swagger UI 中点击右上角 `Authorize`，输入 `X-API-Key`
 - **JWT** — 先调用 `/api/auth/login` 获取 Token，然后在 Authorize 中输入 `Bearer <token>`
+
+### 故障排查
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| `/swagger/doc.json` 返回 500 `no swag has yet been registered` | `docs` 包未导入，`init()` 未执行 | 确认 `internal/router/router.go` 中有 `_ "github.com/gantoho/go-img-sys/docs"` 导入 |
+| `/swagger/index.html` 返回 `Not Found` | 静态文件读取失败 | 重新执行 `make openapi` 生成 `docs/` 文件后重新编译 |
+| `docs/docs.go` 报编译错误 `unknown field LeftDelim` | swag CLI 与 `swaggo/swag` 库版本不匹配 | 执行 `go get github.com/swaggo/swag@latest && swag init ...` |
 
 > **注意**：原有的 `openapi.yaml`（手动维护版本）已被自动生成的 `docs/swagger.yaml` 取代。请勿手动编辑 `openapi.yaml`，所有 API 变更应修改 handler 函数中的 Swagger 注解后重新生成。
 
