@@ -95,6 +95,11 @@ go build -o image-sys ./cmd/image-sys/
 # Makefile
 cd scripts && make run
 ```
+#### 交叉编译
+windows -> linux amd64
+```bash
+$env:GOOS="linux"; $env:GOARCH="amd64"; go build -ldflags="-s -w" -o image-sys ./cmd/image-sys/
+```
 
 ### 热加载开发
 
