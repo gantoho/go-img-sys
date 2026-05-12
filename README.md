@@ -434,6 +434,12 @@ http://localhost:3128/swagger/index.html
 OpenAPI 规范通过代码注释自动生成，**新增或修改路由后需要重新生成**。
 
 **触发方式（任选其一）：**
+先安装swag
+```bash
+go install github.com/swaggo/swag/cmd/swag@latest
+
+swag -v
+```
 
 ```bash
 # 方式 1：Makefile（推荐，会自动安装 swag CLI）
