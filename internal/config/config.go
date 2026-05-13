@@ -15,9 +15,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port    string
-	Env     string
-	Timeout int
+	Port        string
+	Env         string
+	Timeout     int
+	ExternalURL string
 }
 
 type AuthConfig struct {
@@ -65,9 +66,10 @@ func getEnvInt(key string, defaultVal int) int {
 func Init() *Config {
 	appConfig = &Config{
 		Server: ServerConfig{
-			Port:    getEnv("SERVER_PORT", ":3128"),
-			Env:     getEnv("SERVER_ENV", "development"),
-			Timeout: getEnvInt("SERVER_TIMEOUT", 30),
+			Port:        getEnv("SERVER_PORT", ":3128"),
+			Env:         getEnv("SERVER_ENV", "development"),
+			Timeout:     getEnvInt("SERVER_TIMEOUT", 30),
+			ExternalURL: getEnv("EXTERNAL_URL", ""),
 		},
 		File: FileConfig{
 			UploadDir:         getEnv("UPLOAD_DIR", "./files"),
@@ -103,9 +105,10 @@ func GetConfig() *Config {
 func (c *Config) Reload() {
 	cfg := &Config{
 		Server: ServerConfig{
-			Port:    getEnv("SERVER_PORT", ":3128"),
-			Env:     getEnv("SERVER_ENV", "development"),
-			Timeout: getEnvInt("SERVER_TIMEOUT", 30),
+			Port:        getEnv("SERVER_PORT", ":3128"),
+			Env:         getEnv("SERVER_ENV", "development"),
+			Timeout:     getEnvInt("SERVER_TIMEOUT", 30),
+			ExternalURL: getEnv("EXTERNAL_URL", ""),
 		},
 		File: FileConfig{
 			UploadDir:         getEnv("UPLOAD_DIR", "./files"),

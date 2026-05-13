@@ -79,22 +79,53 @@ go-img-sys/
 ### 编译与运行
 
 ```bash
-# 编译
-go build -o image-sys ./cmd/image-sys/
+# 编译（产物在 build/ 目录）
+go build -o build/image-sys ./cmd/image-sys/
 
 # 运行
-./image-sys
+./build/image-sys
 
-# 或使用构建脚本
+# 或使用 Makefile（自动生成 OpenAPI 文档）
+cd scripts && make run
+
+# 使用构建脚本
 # Windows
 .\scripts\build.bat run
 
 # Linux/Mac
 ./scripts/build.sh run
-
-# Makefile
-cd scripts && make run
 ```
+
+### 交叉编译
+
+将项目编译为其他平台的可执行文件，方便部署到服务器：
+
+```bash
+cd scripts
+
+# 编译为 Linux（最常用，适合部署到服务器）
+make build-linux
+
+# 编译为 Windows
+make build-windows
+
+# 编译为 macOS
+make build-darwin
+
+# 一次性编译所有平台
+make build-all
+```
+
+编译产物统一输出到 `build/` 目录：
+
+| 目标平台 | 输出文件 |
+|---------|---------|
+| 当前平台 | `build/image-sys` |
+| Linux (amd64) | `build/image-sys-linux` |
+| Windows (amd64) | `build/image-sys-windows.exe` |
+| macOS (amd64) | `build/image-sys-darwin` |
+
+> 所有二进制文件均输出到项目根目录的 `build/` 文件夹，便于管理。交叉编译需要 Go 标准库支持目标平台，无需额外安装工具链。
 
 ### 热加载开发
 

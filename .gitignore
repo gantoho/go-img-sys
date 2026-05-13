@@ -1,13 +1,11 @@
 # 编译产物和二进制文件
+build/
 *.exe
 *.exe~
 *.dll
 *.so
 *.so.*
 *.dylib
-/image-sys
-/build/image-sys
-image-sys.exe
 
 # 测试输出
 *.test

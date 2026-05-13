@@ -20,10 +20,22 @@ var SupportedImageFormats = map[string]string{
 	".svg":  "image/svg+xml",
 }
 
+var externalBaseURL string
+
+// SetExternalBaseURL sets a global external base URL that overrides
+// auto-detection in GetRequestBaseURL. Useful when running behind a reverse proxy.
+func SetExternalBaseURL(url string) {
+	externalBaseURL = url
+}
+
 // GetRequestBaseURL returns the full base URL (scheme + host) from an HTTP request.
-// It checks X-Forwarded-Proto header for reverse proxy support, then TLS,
-// and falls back to http.
+// It checks X-Forwarded-Proto and X-Forwarded-Host headers for reverse proxy support.
+// If an external base URL has been set via SetExternalBaseURL, it takes precedence.
 func GetRequestBaseURL(r *http.Request) string {
+	if externalBaseURL != "" {
+		return externalBaseURL
+	}
+
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
@@ -31,7 +43,13 @@ func GetRequestBaseURL(r *http.Request) string {
 	if fwd := r.Header.Get("X-Forwarded-Proto"); fwd == "https" || fwd == "http" {
 		scheme = fwd
 	}
-	return scheme + "://" + r.Host
+
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+
+	return scheme + "://" + host
 }
 
 // EnsureDir creates directory if not exists
