@@ -64,6 +64,11 @@ func (s *Server) Start() {
 
 	s.startFileWatcher()
 
+	if s.config.Server.ExternalURL != "" {
+		utils.SetExternalBaseURL(s.config.Server.ExternalURL)
+		s.logger.Info("External URL set to: %s", s.config.Server.ExternalURL)
+	}
+
 	addr := s.config.Server.Port
 	s.logger.Info("Starting Image Server on %s", addr)
 	s.logger.Info("Upload directory: %s", s.config.File.UploadDir)
