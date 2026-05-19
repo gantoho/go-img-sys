@@ -208,13 +208,16 @@ SERVER_PORT=:8080 SERVER_ENV=release JWT_SECRET=my-secure-key go run ./cmd/image
 | GET | `/api/v1/images/metadata` | 图片列表（含元数据） |
 | GET | `/api/v1/images/paginated?page=1&page_size=20` | 分页查询 |
 | GET | `/api/v1/images/search?filename=&min_size=&max_size=&type=` | 搜索/过滤 |
-| GET | `/api/v1/images/random` | 随机一张 |
+| GET | `/api/v1/images/random` | 随机一张（返回文件名） |
 | GET | `/api/v1/images/random/:number` | 随机 N 张（最多 100，Fisher-Yates 无重复） |
 | GET | `/api/v1/util/statistics` | 文件统计 |
 | GET | `/api/v1/util/disk-usage` | 磁盘使用情况 |
-| POST | `/api/v1/system/reload` | 配置热加载 |
+| POST | `/api/v1/admin/api-keys` | 创建 API Key（无需认证） |
+| POST | `/api/v1/admin/api-keys/validate` | 校验 API Key |
 | GET | `/metrics` | Prometheus 监控指标 |
-| GET | `/f/:filename` | 直接获取文件 |
+| GET | `/f/:filename` | 直接获取图片文件 |
+| GET | `/bgimg` | 随机获取一张图片（重定向） |
+| POST | `/upload` | 上传图片（multipart, 字段 `files`，无需认证） |
 
 ### 受保护接口（需 API Key）
 
@@ -223,31 +226,30 @@ SERVER_PORT=:8080 SERVER_ENV=release JWT_SECRET=my-secure-key go run ./cmd/image
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/v1/images/upload` | 上传图片（multipart, 字段 `files`） |
-| DELETE | `/api/v1/images/:filename` | 删除单张 |
-| POST | `/api/v1/images/delete` | 批量删除 |
+| DELETE | `/api/v1/images/:filename` | 删除单张图片 |
+| POST | `/api/v1/images/delete` | 批量删除图片 |
 | POST | `/api/v1/images/upload/chunk/init` | 初始化分片上传 |
 | POST | `/api/v1/images/upload/chunk` | 上传分片 |
 | POST | `/api/v1/images/upload/chunk/complete` | 完成分片合并 |
-| POST | `/api/v1/util/export` | 导出为 ZIP |
-| POST | `/api/v1/util/export-all` | 全量导出 |
-| POST | `/api/v1/util/cleanup` | 磁盘清理 |
+| POST | `/api/v1/util/export` | 导出指定文件为 ZIP |
+| POST | `/api/v1/util/export-all` | 全量导出为 ZIP |
+| POST | `/api/v1/util/cleanup` | 磁盘清理（孤立缩略图/过期文件/空目录） |
 | POST | `/api/v1/util/generate-thumbnails` | 生成缩略图（后台异步） |
 | POST | `/api/v1/system/reload` | 配置热加载 |
 
-### 管理接口（需 API Key + Admin）
+### 管理接口（需 API Key）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/v1/admin/api-keys` | 列出 API Key |
-| DELETE | `/api/v1/admin/api-keys` | 撤销 API Key |
-| POST | `/api/v1/admin/api-keys` | 创建 API Key |
+| GET | `/api/v1/admin/api-keys` | 列出所有 API Key 摘要信息 |
+| DELETE | `/api/v1/admin/api-keys` | 撤销指定的 API Key |
 
 ### JWT 认证
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/auth/login` | 登录获取 JWT |
-| POST | `/api/auth/refresh` | 刷新 JWT |
+| POST | `/api/auth/login` | 登录获取 JWT Token |
+| POST | `/api/auth/refresh` | 刷新 JWT Token 有效期 |
 
 ### 遗留 API（向后兼容）
 
@@ -257,7 +259,7 @@ SERVER_PORT=:8080 SERVER_ENV=release JWT_SECRET=my-secure-key go run ./cmd/image
 | GET | `/v1/all` | 所有图片 |
 | GET | `/v1/bgimg` | 随机图片 |
 | GET | `/v1/get/:number` | 随机 N 张 |
-| POST | `/v1/upload` | 上传 |
+| POST | `/v1/upload` | 上传图片（需 API Key） |
 
 更多请求示例见 [api/api.http](api/api.http)。
 

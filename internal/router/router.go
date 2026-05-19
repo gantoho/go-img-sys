@@ -152,6 +152,7 @@ func registerRoutes(router *gin.Engine, imageHandler *handler.ImageHandler, jwtM
 
 	router.GET("/f/:filename", imageHandler.GetImage)
 	router.GET("/bgimg", imageHandler.GetRandomImage)
+	router.POST("/upload", imageHandler.UploadImage)
 
 	legacyV1 := router.Group("/v1")
 	{
